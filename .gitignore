@@ -17,6 +17,11 @@ logs/
 # Auto-managed binary (downloaded at boot by ytdlp-updater)
 bin/
 
+# Release build artifacts (uploaded to GitHub Releases, not tracked)
+AppDir/
+release-staging/
+desktop/target/debian/
+
 # Editors
 .vscode/
 .idea/
