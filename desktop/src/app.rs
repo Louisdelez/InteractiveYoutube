@@ -961,6 +961,89 @@ impl Render for AppView {
                                 }
                                 pill.child(format!("{}", self.total_viewers))
                             })
+                            // Refresh button — F5-like client-only refresh.
+                            // No server side effect: the server just gets read
+                            // requests it already serves to anyone. Effects:
+                            //   1. Re-fetch /api/tv/channels → sidebar rebuild
+                            //   2. Ask server to re-emit chat:history for the
+                            //      current channel (chat panel resets)
+                            //   3. Ask server for a fresh tv:state (player
+                            //      resync — loadfile if video changed)
+                            //   4. Re-push the anonymous pseudo so the new
+                            //      chat:history is rendered with the right
+                            //      identity if the user types right after.
+                            .child({
+                                let icon = self
+                                    .icons
+                                    .borrow_mut()
+                                    .get(IconName::Refresh, 14, 0xaaaaaa);
+                                let mut btn = div()
+                                    .id("refresh-btn")
+                                    .w(px(22.0))
+                                    .h(px(22.0))
+                                    .flex()
+                                    .items_center()
+                                    .justify_center()
+                                    .rounded(px(4.0))
+                                    .cursor_pointer()
+                                    .hover(|this| this.bg(rgb(0x26262b)))
+                                    .on_click(cx.listener(|this: &mut AppView, _ev: &ClickEvent, _, cx| {
+                                        // 1. Re-fetch channels in the background
+                                        //    and push them to the sidebar.
+                                        let sidebar = this.sidebar.clone();
+                                        cx.spawn(async move |_, cx| {
+                                            let (tx, rx) = std::sync::mpsc::channel::<
+                                                Vec<(String, String, String, String)>
+                                            >();
+                                            std::thread::spawn(move || {
+                                                if let Ok(channels) = api::fetch_channels() {
+                                                    let _ = tx.send(
+                                                        channels.into_iter()
+                                                            .map(|c| (c.id, c.name, c.handle, c.avatar))
+                                                            .collect(),
+                                                    );
+                                                }
+                                            });
+                                            // Wait up to ~3s for the fetch
+                                            for _ in 0..30 {
+                                                if let Ok(channels) = rx.try_recv() {
+                                                    let _ = cx.update(|cx| {
+                                                        sidebar.update(cx, |s, cx| {
+                                                            s.set_channels_from_server(channels);
+                                                            cx.notify();
+                                                        });
+                                                    });
+                                                    return;
+                                                }
+                                                cx.background_executor().timer(
+                                                    std::time::Duration::from_millis(100)
+                                                ).await;
+                                            }
+                                        }).detach();
+
+                                        // 2. Re-pull chat history for current
+                                        //    channel + 3. resync TV state.
+                                        if let Some(ch) = &this.current_channel_id {
+                                            let _ = this.cmd_tx.send(
+                                                ClientCommand::ChatChannelChanged(ch.clone())
+                                            );
+                                        }
+                                        let _ = this.cmd_tx.send(ClientCommand::RequestState);
+
+                                        // 4. Re-push our anonymous identity so
+                                        //    new outgoing messages keep the
+                                        //    same pseudo if we type next.
+                                        let pseudo = crate::services::pseudo::get_or_create_pseudo();
+                                        let color = crate::services::pseudo::get_or_create_color();
+                                        let _ = this.cmd_tx.send(
+                                            ClientCommand::SetAnonymousName { name: pseudo, color }
+                                        );
+                                    }));
+                                if let Some(icon) = icon {
+                                    btn = btn.child(img(icon).w(px(14.0)).h(px(14.0)));
+                                }
+                                btn
+                            })
                     })
                     // Center: search bar — height tuned so the
                     // gpui-component Input fits inside the 36px topbar
