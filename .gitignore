@@ -21,6 +21,10 @@ bin/
 AppDir/
 release-staging/
 desktop/target/debian/
+dist-staging/koala-tv-v*-windows-x86_64/
+dist-staging/*.zip
+dist-staging/*.sha256
+dist-staging/*-setup.exe
 
 # Editors
 .vscode/
