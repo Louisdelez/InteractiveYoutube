@@ -2,9 +2,11 @@ import { useState, useEffect } from 'react';
 import socket from './services/socket';
 import { useSocket } from './hooks/useSocket';
 import { useAuth } from './hooks/useAuth';
+import { usePing } from './hooks/usePing';
 import { MessageSquare, MessageSquareOff, LogIn, LogOut, User, Search, Download, Info, Eye } from 'lucide-react';
 import DownloadPage from './components/DownloadPage';
 import AboutPage from './components/AboutPage';
+import SignalBars from './components/SignalBars';
 
 const REPO_URL = 'https://github.com/Louisdelez/KoalaTV';
 
@@ -38,6 +40,7 @@ import './App.css';
 export default function App() {
   const { isConnected } = useSocket();
   const { user, login, register, logout } = useAuth();
+  const ping = usePing();
   const [chatOpen, setChatOpen] = useState(true);
   const [showAuth, setShowAuth] = useState(false);
   const [currentChannel, setCurrentChannel] = useState('amixem');
@@ -146,6 +149,7 @@ export default function App() {
               <span>Connexion</span>
             </button>
           )}
+          <SignalBars ping={ping} />
         </div>
       </div>
       <div className="main-content">

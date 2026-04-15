@@ -1,0 +1,14 @@
+.signal-bars {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 15px;
+  margin-left: 4px;
+  cursor: default;
+}
+
+.signal-bar {
+  width: 3px;
+  border-radius: 1px;
+  transition: background 0.2s ease;
+}
