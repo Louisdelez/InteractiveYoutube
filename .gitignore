@@ -25,6 +25,7 @@ dist-staging/koala-tv-v*-windows-x86_64/
 dist-staging/*.zip
 dist-staging/*.sha256
 dist-staging/*-setup.exe
+dist-macos/
 
 # Editors
 .vscode/
