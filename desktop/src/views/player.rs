@@ -243,6 +243,9 @@ pub struct PlayerView {
     /// dragging the off-screen mpv child window back into view on
     /// the next render.
     video_hidden: bool,
+    /// Whether the chat sidebar is currently visible. Drives the player
+    /// width — when false, mpv extends over the 340 px chat area.
+    chat_open: bool,
     /// Hard fallback deadline for the loading overlay (so the screen never
     /// stays black forever if mpv silently fails). The overlay also clears
     /// as soon as `loading_for_video` is recognised in mpv's `path`.
@@ -1005,6 +1008,7 @@ impl PlayerView {
                 display,
                 last_area: None,
                 video_hidden: false,
+                chat_open: true,
                 // Show the black loading screen at startup. We use a far-future
                 // deadline; the first `load_state` call will set a real one.
                 loading_until: None,
@@ -1318,6 +1322,16 @@ impl PlayerView {
     /// XUnmap, because mpv with `force-window=yes` re-maps itself
     /// shortly after, defeating the purpose.
     #[cfg(target_os = "linux")]
+    /// Called by AppView when the user toggles the chat sidebar.
+    /// Triggers a re-layout on the next render: mpv extends over the
+    /// freed area when chat is hidden.
+    pub fn set_chat_open(&mut self, open: bool) {
+        self.chat_open = open;
+        // Force the next render's apply_geometry to actually emit a
+        // resize by invalidating last_area.
+        self.last_area = None;
+    }
+
     pub fn hide_video(&mut self) {
         self.video_hidden = true;
         unsafe {
@@ -1743,7 +1757,8 @@ impl Render for PlayerView {
         #[cfg(target_os = "linux")]
         {
             let vs = window.viewport_size();
-            let w = (f32::from(vs.width) - SIDEBAR_W - CHAT_W).max(100.0) as u32;
+            let chat_w = if self.chat_open { CHAT_W } else { 0.0 };
+            let w = (f32::from(vs.width) - SIDEBAR_W - chat_w).max(100.0) as u32;
             let h = (f32::from(vs.height) - TOPBAR_H - CONTROL_BAR_H - INFOBAR_H).max(100.0) as u32;
             // mpv is at the on-screen position when no modal is open,
             // off-screen when a modal hides it (so GPUI overlays

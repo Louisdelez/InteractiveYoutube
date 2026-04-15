@@ -24,6 +24,8 @@ const SVG_TV: &[u8] = include_bytes!("../../assets/icons/tv.svg");
 const SVG_STAR: &[u8] = include_bytes!("../../assets/icons/star.svg");
 const SVG_GITHUB: &[u8] = include_bytes!("../../assets/icons/github.svg");
 const SVG_EYE: &[u8] = include_bytes!("../../assets/icons/eye.svg");
+const SVG_MSG: &[u8] = include_bytes!("../../assets/icons/message-square.svg");
+const SVG_MSG_OFF: &[u8] = include_bytes!("../../assets/icons/message-square-off.svg");
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
 pub enum IconName {
@@ -41,6 +43,8 @@ pub enum IconName {
     Star,
     Github,
     Eye,
+    MessageSquare,
+    MessageSquareOff,
 }
 
 impl IconName {
@@ -60,6 +64,8 @@ impl IconName {
             IconName::Star => SVG_STAR,
             IconName::Github => SVG_GITHUB,
             IconName::Eye => SVG_EYE,
+            IconName::MessageSquare => SVG_MSG,
+            IconName::MessageSquareOff => SVG_MSG_OFF,
         }
     }
 }

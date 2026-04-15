@@ -35,7 +35,28 @@ async function emitViewerCount(channelId) {
   const count = await redis.scard(viewerSetKey(channelId));
   io.to(`channel:${channelId}`).volatile.emit('viewers:count', { count });
   metrics.viewersGauge.set({ channel: channelId }, count);
+  // Recompute and broadcast the global total so every client's topbar
+  // ticker stays in sync. SCARD is O(1), and 48 channels = a single
+  // pipelined Redis round-trip.
+  await emitViewerTotal();
   return count;
+}
+
+async function emitViewerTotal() {
+  if (!io) return 0;
+  try {
+    const pipe = redis.pipeline();
+    for (const channelId of ALL_CHANNEL_IDS) {
+      pipe.scard(viewerSetKey(channelId));
+    }
+    const results = await pipe.exec();
+    const total = results.reduce((sum, [err, n]) => sum + (err ? 0 : (n || 0)), 0);
+    io.volatile.emit('viewers:total', { total });
+    return total;
+  } catch (err) {
+    log.warn({ err: err.message }, 'emitViewerTotal failed');
+    return 0;
+  }
 }
 
 async function joinChannel(socket, channelId) {
@@ -142,6 +163,15 @@ function setupSocketIO(httpServer) {
     socket.emit('viewers:count', {
       count: await redis.scard(viewerSetKey(defaultChannel)),
     });
+    // Send the global total to the new client so the topbar ticker
+    // populates immediately, before the first emitViewerTotal broadcast.
+    try {
+      const pipe = redis.pipeline();
+      for (const cid of ALL_CHANNEL_IDS) pipe.scard(viewerSetKey(cid));
+      const r = await pipe.exec();
+      const total = r.reduce((s, [err, n]) => s + (err ? 0 : (n || 0)), 0);
+      socket.emit('viewers:total', { total });
+    } catch {}
     metrics.connectionsCounter.inc();
     log.info(
       {

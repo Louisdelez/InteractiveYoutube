@@ -56,6 +56,18 @@ body {
 }
 .top-bar-github:hover { color: #efeff1; }
 
+.top-bar-viewers {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #bf94ff;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: rgba(155, 89, 182, 0.12);
+}
+
 .top-bar-download {
   display: inline-flex;
   align-items: center;

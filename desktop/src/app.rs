@@ -39,6 +39,11 @@ pub struct AppView {
     user: Option<User>,
     /// Auth panel visible (replaces the chat panel) when set.
     auth: Option<Entity<AuthView>>,
+    /// Whether the chat sidebar is visible. Toggled from the topbar.
+    chat_open: bool,
+    /// Total viewers across all channels — pushed by the server's
+    /// `viewers:total` event, displayed in the topbar.
+    total_viewers: usize,
     /// Settings modal (gear icon in topbar). None = closed.
     settings_modal: Option<Entity<SettingsModal>>,
     /// Persistent user preferences (memory cache size, favourites).
@@ -418,6 +423,14 @@ impl AppView {
                                             cx.notify();
                                         });
                                     }
+                                    ServerEvent::ViewerTotal { total } => {
+                                        if let Some(e) = entity_for_status.upgrade() {
+                                            e.update(cx, |this, cx| {
+                                                this.total_viewers = total;
+                                                cx.notify();
+                                            });
+                                        }
+                                    }
                                     ServerEvent::Connected => {
                                         if let Some(e) = entity_for_status.upgrade() {
                                             e.update(cx, |this, cx| {
@@ -625,6 +638,8 @@ impl AppView {
                 frame_times: Rc::new(RefCell::new(std::collections::VecDeque::with_capacity(128))),
                 user: None,
                 auth: None,
+                chat_open: true,
+                total_viewers: 0,
                 settings_modal: None,
                 settings: initial_settings,
                 tooltip,
@@ -922,6 +937,30 @@ impl Render for AppView {
                                 }
                                 link
                             })
+                            // Total viewers across all channels — pushed by
+                            // the server's `viewers:total` event. Sits to
+                            // the right of the GitHub icon.
+                            .child({
+                                let eye = self
+                                    .icons
+                                    .borrow_mut()
+                                    .get(IconName::Eye, 13, 0xbf94ff);
+                                let mut pill = div()
+                                    .flex()
+                                    .items_center()
+                                    .gap(px(4.0))
+                                    .px_2()
+                                    .py(px(2.0))
+                                    .rounded(px(6.0))
+                                    .text_xs()
+                                    .font_weight(FontWeight::SEMIBOLD)
+                                    .text_color(rgb(0xbf94ff))
+                                    .bg(rgba(0x9b59b61f));
+                                if let Some(icon) = eye {
+                                    pill = pill.child(img(icon).w(px(13.0)).h(px(13.0)));
+                                }
+                                pill.child(format!("{}", self.total_viewers))
+                            })
                     })
                     // Center: search bar — height tuned so the
                     // gpui-component Input fits inside the 36px topbar
@@ -970,6 +1009,41 @@ impl Render for AppView {
                             .justify_end()
                             .items_center()
                             .gap_3()
+                            // Chat toggle — show/hide the right sidebar.
+                            // Same place + behaviour as the web's chat-toggle.
+                            // Sits to the LEFT of the auth pill.
+                            .child({
+                                let chat_open = self.chat_open;
+                                let icon_name = if chat_open {
+                                    IconName::MessageSquareOff
+                                } else {
+                                    IconName::MessageSquare
+                                };
+                                let icon = self
+                                    .icons
+                                    .borrow_mut()
+                                    .get(icon_name, 16, 0xaaaaaa);
+                                let mut btn = div()
+                                    .id("chat-toggle")
+                                    .w(px(24.0))
+                                    .h(px(24.0))
+                                    .flex()
+                                    .items_center()
+                                    .justify_center()
+                                    .rounded(px(4.0))
+                                    .cursor_pointer()
+                                    .hover(|this| this.bg(rgb(0x26262b)))
+                                    .on_click(cx.listener(|this: &mut AppView, _ev: &ClickEvent, _, cx| {
+                                        this.chat_open = !this.chat_open;
+                                        let open = this.chat_open;
+                                        this.player.update(cx, |p, _| p.set_chat_open(open));
+                                        cx.notify();
+                                    }));
+                                if let Some(icon) = icon {
+                                    btn = btn.child(img(icon).w(px(16.0)).h(px(16.0)));
+                                }
+                                btn
+                            })
                             // Auth pill
                             .child(match user {
                                 Some(u) => {
@@ -1079,15 +1153,18 @@ impl Render for AppView {
                             )
                     })
             )
-            .child(
-                div()
+            .child({
+                let mut row = div()
                     .flex()
                     .flex_1()
                     .min_h(px(0.0))
                     .child(self.sidebar.clone())
-                    .child(self.player.clone())
-                    .child(self.chat.clone()),
-            )
+                    .child(self.player.clone());
+                if self.chat_open {
+                    row = row.child(self.chat.clone());
+                }
+                row
+            })
             // Offline curtain: when the server is unreachable we hide the
             // mpv child window and cover the whole window with a dark overlay
             // so the user can't interact with stale content. Without the

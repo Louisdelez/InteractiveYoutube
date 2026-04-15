@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
+import socket from './services/socket';
 import { useSocket } from './hooks/useSocket';
 import { useAuth } from './hooks/useAuth';
-import { MessageSquare, MessageSquareOff, LogIn, LogOut, User, Search, Download, Info } from 'lucide-react';
+import { MessageSquare, MessageSquareOff, LogIn, LogOut, User, Search, Download, Info, Eye } from 'lucide-react';
 import DownloadPage from './components/DownloadPage';
 import AboutPage from './components/AboutPage';
 
@@ -44,11 +45,18 @@ export default function App() {
   const [route, setRoute] = useState(
     typeof window !== 'undefined' ? window.location.hash : ''
   );
+  const [totalViewers, setTotalViewers] = useState(0);
 
   useEffect(() => {
     const onHash = () => setRoute(window.location.hash);
     window.addEventListener('hashchange', onHash);
     return () => window.removeEventListener('hashchange', onHash);
+  }, []);
+
+  useEffect(() => {
+    const onTotal = ({ total }) => setTotalViewers(total);
+    socket.on('viewers:total', onTotal);
+    return () => socket.off('viewers:total', onTotal);
   }, []);
 
   if (route === '#download') {
@@ -85,6 +93,10 @@ export default function App() {
           >
             <GithubIcon size={15} />
           </a>
+          <span className="top-bar-viewers" title="Viewers en ligne (toutes chaînes)">
+            <Eye size={13} />
+            <span>{totalViewers}</span>
+          </span>
           <a
             href="#download"
             className="top-bar-download"

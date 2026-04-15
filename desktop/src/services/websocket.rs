@@ -43,6 +43,11 @@ pub enum ServerEvent {
     ViewerCount {
         count: usize,
     },
+    /// Total viewers across all channels — broadcast on every channel
+    /// presence change, displayed in the topbar.
+    ViewerTotal {
+        total: usize,
+    },
     Connected,
     Disconnected,
 }
@@ -83,6 +88,7 @@ fn run_socket_loop(events: Sender<ServerEvent>, cmd_rx: Receiver<ClientCommand>)
         let ev_chat = events.clone();
         let ev_history = events.clone();
         let ev_viewers = events.clone();
+        let ev_total = events.clone();
         let ev_cleared = events.clone();
         let ev_disc = events.clone();
 
@@ -155,6 +161,17 @@ fn run_socket_loop(events: Sender<ServerEvent>, cmd_rx: Receiver<ClientCommand>)
                         if let Some(count) = v.get("count").and_then(|c| c.as_u64()) {
                             let _ = ev_viewers.send(ServerEvent::ViewerCount {
                                 count: count as usize,
+                            });
+                        }
+                    }
+                }
+            })
+            .on("viewers:total", move |payload, _| {
+                if let Payload::Text(values) = payload {
+                    if let Some(v) = values.first() {
+                        if let Some(total) = v.get("total").and_then(|c| c.as_u64()) {
+                            let _ = ev_total.send(ServerEvent::ViewerTotal {
+                                total: total as usize,
                             });
                         }
                     }
