@@ -23,6 +23,7 @@ const SVG_HISTORY: &[u8] = include_bytes!("../../assets/icons/history.svg");
 const SVG_TV: &[u8] = include_bytes!("../../assets/icons/tv.svg");
 const SVG_STAR: &[u8] = include_bytes!("../../assets/icons/star.svg");
 const SVG_GITHUB: &[u8] = include_bytes!("../../assets/icons/github.svg");
+const SVG_EYE: &[u8] = include_bytes!("../../assets/icons/eye.svg");
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
 pub enum IconName {
@@ -39,6 +40,7 @@ pub enum IconName {
     Tv,
     Star,
     Github,
+    Eye,
 }
 
 impl IconName {
@@ -57,6 +59,7 @@ impl IconName {
             IconName::Tv => SVG_TV,
             IconName::Star => SVG_STAR,
             IconName::Github => SVG_GITHUB,
+            IconName::Eye => SVG_EYE,
         }
     }
 }

@@ -29,6 +29,8 @@ pub struct ChatView {
     /// Scroll handle for the messages list — used to auto-scroll to the
     /// latest message after every push / replace.
     messages_scroll: ScrollHandle,
+    /// Icon cache (just the eye icon for now, used in the viewer count).
+    icons: crate::views::icons::IconCache,
     #[allow(dead_code)]
     _subs: Vec<Subscription>,
 }
@@ -75,6 +77,7 @@ impl ChatView {
             emoji_category: 0,
             emoji_cache: HashMap::new(),
             messages_scroll: ScrollHandle::new(),
+            icons: crate::views::icons::IconCache::new(),
             _subs: vec![sub],
         }
     }
@@ -170,10 +173,26 @@ impl Render for ChatView {
                             .text_color(rgb(0xefeff1))
                             .child("Chat en direct")
                     )
-                    .child(
-                        div().text_xs().text_color(rgb(0x888888))
-                            .child(format!("{}", self.viewer_count))
-                    )
+                    .child({
+                        // Match the web ViewerCount: eye + bold count, both
+                        // light violet (#BF94FF — the same as the web CSS).
+                        let eye = self.icons.get(
+                            crate::views::icons::IconName::Eye,
+                            14,
+                            0xbf94ff,
+                        );
+                        let mut row = div()
+                            .flex()
+                            .items_center()
+                            .gap(px(6.0))
+                            .text_color(rgb(0xbf94ff))
+                            .text_xs()
+                            .font_weight(FontWeight::SEMIBOLD);
+                        if let Some(icon) = eye {
+                            row = row.child(img(icon).w(px(14.0)).h(px(14.0)));
+                        }
+                        row.child(format!("{}", self.viewer_count))
+                    })
             )
             .child(
                 if self.messages.is_empty() {
@@ -381,6 +400,37 @@ impl Render for ChatView {
                         .child(
                             div().flex_1().child(Input::new(&self.input_state))
                         )
+                        .child({
+                            // Send button — mirrors the web's purple "Chat"
+                            // button. Reads the current input value, emits
+                            // ChatSend if non-empty, then clears the field.
+                            // Same effect as pressing Enter.
+                            let input_handle = self.input_state.clone();
+                            div()
+                                .id("chat-send-btn")
+                                .px_3()
+                                .h(px(28.0))
+                                .flex()
+                                .items_center()
+                                .justify_center()
+                                .rounded(px(4.0))
+                                .text_xs()
+                                .font_weight(FontWeight::SEMIBOLD)
+                                .bg(rgb(0x9b59b6))
+                                .text_color(rgb(0xffffff))
+                                .cursor_pointer()
+                                .hover(|this| this.bg(rgb(0xac6dc7)))
+                                .child("Chat")
+                                .on_click(cx.listener(move |_this: &mut ChatView, _, window, cx| {
+                                    let text = input_handle.read(cx).value().to_string();
+                                    let trimmed = text.trim();
+                                    if trimmed.is_empty() { return; }
+                                    cx.emit(ChatSend { text: trimmed.to_string() });
+                                    input_handle.update(cx, |s, cx| {
+                                        s.set_value("", window, cx);
+                                    });
+                                }))
+                        })
                 )
             })
     }
