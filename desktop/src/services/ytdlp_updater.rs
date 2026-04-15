@@ -1,6 +1,6 @@
 // Auto-updater for yt-dlp (desktop).
 //
-// Owns a user-local binary under $XDG_DATA_HOME/InteractiveYoutube/bin/yt-dlp.
+// Owns a user-local binary under $XDG_DATA_HOME/KoalaTV/bin/yt-dlp.
 // Runs at launch: downloads if missing, else invokes `yt-dlp -U`. A background
 // thread repeats the update every UPDATE_INTERVAL. The resolved path is
 // injected into libmpv via `script-opts=ytdl_hook-ytdl_path=...` so the player
@@ -20,11 +20,11 @@ static YTDLP_PATH: OnceLock<PathBuf> = OnceLock::new();
 fn data_dir() -> PathBuf {
     if let Ok(x) = std::env::var("XDG_DATA_HOME") {
         if !x.is_empty() {
-            return PathBuf::from(x).join("InteractiveYoutube");
+            return PathBuf::from(x).join("KoalaTV");
         }
     }
     let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".into());
-    PathBuf::from(home).join(".local/share/InteractiveYoutube")
+    PathBuf::from(home).join(".local/share/KoalaTV")
 }
 
 pub fn binary_path() -> PathBuf {

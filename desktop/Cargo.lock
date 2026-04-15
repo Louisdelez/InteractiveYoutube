@@ -3167,30 +3167,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "interactiveyoutube-desktop"
-version = "1.0.0"
-dependencies = [
- "anyhow",
- "futures-util",
- "gpui",
- "gpui-component",
- "gpui_platform",
- "image",
- "libmpv2",
- "png 0.17.16",
- "raw-window-handle",
- "reqwest",
- "resvg 0.44.0",
- "rust_socketio",
- "serde",
- "serde_json",
- "tiny-skia",
- "url",
- "usvg 0.44.0",
- "x11-dl",
-]
-
-[[package]]
 name = "interpolate_name"
 version = "0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3356,6 +3332,30 @@ name = "khronos_api"
 version = "3.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e2db585e1d738fc771bf08a151420d3ed193d9d895a36df7f6f8a9456b911ddc"
+
+[[package]]
+name = "koala-tv-desktop"
+version = "1.0.0"
+dependencies = [
+ "anyhow",
+ "futures-util",
+ "gpui",
+ "gpui-component",
+ "gpui_platform",
+ "image",
+ "libmpv2",
+ "png 0.17.16",
+ "raw-window-handle",
+ "reqwest",
+ "resvg 0.44.0",
+ "rust_socketio",
+ "serde",
+ "serde_json",
+ "tiny-skia",
+ "url",
+ "usvg 0.44.0",
+ "x11-dl",
+]
 
 [[package]]
 name = "kqueue"

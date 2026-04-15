@@ -29,11 +29,32 @@ body {
   flex-shrink: 0;
 }
 
+.top-bar-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.top-bar-logo {
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+  border-radius: 4px;
+}
+
 .top-bar-title {
   font-size: 0.8rem;
   font-weight: 600;
   color: #9b59b6;
 }
+
+.top-bar-github {
+  display: inline-flex;
+  align-items: center;
+  color: #aaa;
+  transition: color 0.15s ease;
+}
+.top-bar-github:hover { color: #efeff1; }
 
 .top-bar-search {
   display: flex;

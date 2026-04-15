@@ -22,7 +22,7 @@ const config = {
   // Override via env when a release is published.
   DESKTOP_DOWNLOAD_URL:
     process.env.DESKTOP_DOWNLOAD_URL ||
-    'https://github.com/InteractiveYoutube/releases/latest',
+    'https://github.com/Louisdelez/InteractiveYoutube/releases/latest',
 
   // Multi-channel configuration
   // - youtubeChannelIds: array — videos from all IDs merge into one playlist

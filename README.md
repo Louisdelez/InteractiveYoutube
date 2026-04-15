@@ -1,6 +1,24 @@
-# InteractiveYoutube
+<p align="center">
+  <img src="client/public/koala-tv.png" alt="Koala TV" width="160" />
+</p>
 
-A synced multi-channel YouTube TV. All viewers on the same channel watch the **same video at the same timecode**, with a shared live chat. Think of it as a tiny streaming TV station powered by YouTube playlists.
+<h1 align="center">Koala TV</h1>
+
+<p align="center">
+  A synced multi-channel YouTube TV — same video, same second, for every viewer on a channel.<br />
+  Web client + native desktop app + Node.js server, powered by YouTube playlists and a shared live chat.
+</p>
+
+<p align="center">
+  <a href="LICENSE"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-8b5cf6" /></a>
+  <img alt="Node 20+" src="https://img.shields.io/badge/node-20+-3c873a" />
+  <img alt="Rust stable" src="https://img.shields.io/badge/rust-stable-ce422b" />
+  <img alt="React 19" src="https://img.shields.io/badge/react-19-61dafb" />
+</p>
+
+---
+
+Koala TV schedules YouTube videos on fixed "channels" and broadcasts the exact playhead position to every connected viewer. Drop in, you land right where the others are — no rewind, no catch-up.
 
 - **Server** (Node.js + Express + Socket.IO) — the TV scheduler and source of truth. Drives ~48 channels built from YouTube creator uploads, holds the wallclock, broadcasts drift corrections.
 - **Web client** (Vite + React) — browser app that embeds a YouTube iframe and falls back to a YouTube deep-link with live timecode when a video is not embeddable.
@@ -45,7 +63,7 @@ cd desktop
 cargo run              # pulls libmpv, builds, launches
 ```
 
-On first launch the desktop app downloads its own `yt-dlp` to `$XDG_DATA_HOME/InteractiveYoutube/bin/yt-dlp`.
+On first launch the desktop app downloads its own `yt-dlp` to `$XDG_DATA_HOME/KoalaTV/bin/yt-dlp`.
 
 ## Production
 

@@ -3,7 +3,7 @@ import { Download, ExternalLink, MonitorPlay } from 'lucide-react';
 import { api } from '../services/api';
 import './PlayerFallback.css';
 
-const FALLBACK_DOWNLOAD_URL = 'https://github.com/InteractiveYoutube/releases/latest';
+const FALLBACK_DOWNLOAD_URL = 'https://github.com/Louisdelez/InteractiveYoutube/releases/latest';
 
 export default function PlayerFallback({ tvState, clockOffset }) {
   const [currentTime, setCurrentTime] = useState(0);

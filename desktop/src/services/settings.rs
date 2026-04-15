@@ -1,6 +1,6 @@
 //! User settings — memory cache capacity + favourites list.
 //!
-//! Persisted to `~/.config/interactiveyoutube/settings.json` for the
+//! Persisted to `~/.config/koala-tv/settings.json` for the
 //! anonymous case. When a user is logged in, also synchronised with
 //! the server via `GET/PUT /api/user/settings` so the same prefs
 //! follow them across machines / fresh installs.
@@ -45,7 +45,7 @@ fn config_path() -> Option<PathBuf> {
                 p
             })
         })?;
-    path.push("interactiveyoutube");
+    path.push("koala-tv");
     Some(path)
 }
 

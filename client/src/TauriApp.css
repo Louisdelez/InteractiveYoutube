@@ -22,11 +22,32 @@
   z-index: 100;
 }
 
+.tauri-topbar-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tauri-topbar-logo {
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+  border-radius: 4px;
+}
+
 .tauri-topbar-title {
   font-size: 0.8rem;
   font-weight: 600;
   color: #9b59b6;
 }
+
+.tauri-topbar-github {
+  display: inline-flex;
+  align-items: center;
+  color: #aaa;
+  transition: color 0.15s ease;
+}
+.tauri-topbar-github:hover { color: #efeff1; }
 
 .tauri-topbar-search {
   display: flex;

@@ -1,7 +1,7 @@
 module.exports = {
   apps: [
     {
-      name: 'interactiveyoutube',
+      name: 'koala-tv',
       script: 'server/index.js',
       instances: 'max', // 1 worker per CPU core
       exec_mode: 'cluster',

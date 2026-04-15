@@ -15,7 +15,7 @@ Rust (edition 2021) + [GPUI](https://www.gpui.rs) (Zed's UI framework) + [libmpv
 1. Spawns the yt-dlp auto-updater daemon thread (downloads / `-U` / sleep 6 h / repeat).
 2. `gpui_platform::application().run(...)` — X11/Wayland backend init.
 3. Forces `ThemeMode::Dark` so all gpui-component widgets use a dark palette.
-4. Opens a 1280×800 window titled "InteractiveYoutube" and mounts `AppView` wrapped in `gpui_component::Root`.
+4. Opens a 1280×800 window titled "Koala TV" and mounts `AppView` wrapped in `gpui_component::Root`.
 
 ## AppView (`src/app.rs`)
 
@@ -33,7 +33,7 @@ State:
 - `frame_times: VecDeque<Instant>`: rolling 1-second window of render() calls. `len()` = current FPS. A 200 ms self-notify keeps the counter updating even when the rest of the UI is idle.
 - `hovered_channel` + `tooltip: Rc<RefCell<Option<TooltipOverlay>>>`: the shared X11 override-redirect tooltip window (above mpv).
 - `auth`, `settings_modal`: overlays that replace the chat panel when open.
-- `settings: Settings`: loaded from `~/.config/interactiveyoutube/settings.json`, synced to the server when logged in.
+- `settings: Settings`: loaded from `~/.config/koala-tv/settings.json`, synced to the server when logged in.
 
 Subscriptions (GPUI's event system):
 - `ChannelSelected(id, name, handle)` → emits `ClientCommand::SwitchChannel(id)` to the websocket thread, clears chat, updates sidebar.
@@ -171,13 +171,13 @@ On a 32-bit depth visual, `XBlackPixel` is **fully transparent** (0x00000000) �
 
 ### `ytdlp_updater.rs`
 
-- Path: `$XDG_DATA_HOME/InteractiveYoutube/bin/yt-dlp` (or `$HOME/.local/share/…`).
+- Path: `$XDG_DATA_HOME/KoalaTV/bin/yt-dlp` (or `$HOME/.local/share/…`).
 - On spawn: immediate `tick` (download if missing → `yt-dlp -U --update-to stable` → log version diff) → `thread::sleep(6 h)` → repeat.
 - `binary_path()` is read by `player.rs` to inject the path into mpv via `script-opts=ytdl_hook-ytdl_path=…`.
 
 ### `settings.rs`
 
-Serde JSON to `~/.config/interactiveyoutube/settings.json`. Soft preference: any read/write error is logged and ignored (not critical). On login, server settings win over local; on change, we push via `api::put_user_settings`.
+Serde JSON to `~/.config/koala-tv/settings.json`. Soft preference: any read/write error is logged and ignored (not critical). On login, server settings win over local; on change, we push via `api::put_user_settings`.
 
 ### `pseudo.rs`
 

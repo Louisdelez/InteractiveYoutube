@@ -740,6 +740,16 @@ fn spawn_push_user_settings(settings: Settings) {
     });
 }
 
+/// App logo (koala) — embedded at compile time, decoded once.
+const LOGO_PNG: &[u8] = include_bytes!("../assets/koala-tv.png");
+fn koala_logo() -> std::sync::Arc<Image> {
+    use std::sync::OnceLock;
+    static CACHE: OnceLock<std::sync::Arc<Image>> = OnceLock::new();
+    CACHE
+        .get_or_init(|| std::sync::Arc::new(Image::from_bytes(ImageFormat::Png, LOGO_PNG.to_vec())))
+        .clone()
+}
+
 fn detect_image_format(bytes: &[u8]) -> ImageFormat {
     if bytes.len() >= 8 && &bytes[0..8] == b"\x89PNG\r\n\x1a\n" {
         ImageFormat::Png
@@ -876,15 +886,43 @@ impl Render for AppView {
                     .bg(rgb(0x18181b))
                     .border_b_1()
                     .border_color(rgb(0x2d2d30))
-                    // Left: app title (flex_1 to balance with right)
-                    .child(
+                    // Left: app title + GitHub link (flex_1 to balance right)
+                    .child({
+                        let gh_icon = self
+                            .icons
+                            .borrow_mut()
+                            .get(IconName::Github, 15, 0xaaaaaa);
+                        let logo = koala_logo();
                         div()
                             .flex_1()
-                            .text_xs()
-                            .font_weight(FontWeight::SEMIBOLD)
-                            .text_color(rgb(0x9b59b6))
-                            .child("InteractiveYoutube"),
-                    )
+                            .flex()
+                            .items_center()
+                            .gap(px(8.0))
+                            .child(img(logo).w(px(22.0)).h(px(22.0)))
+                            .child(
+                                div()
+                                    .text_xs()
+                                    .font_weight(FontWeight::SEMIBOLD)
+                                    .text_color(rgb(0x9b59b6))
+                                    .child("Koala TV"),
+                            )
+                            .child({
+                                let mut link = div()
+                                    .id("github-link")
+                                    .flex()
+                                    .items_center()
+                                    .cursor_pointer()
+                                    .on_click(|_, _window, _cx| {
+                                        let _ = std::process::Command::new("xdg-open")
+                                            .arg("https://github.com/Louisdelez/InteractiveYoutube")
+                                            .spawn();
+                                    });
+                                if let Some(icon) = gh_icon {
+                                    link = link.child(img(icon).w(px(15.0)).h(px(15.0)));
+                                }
+                                link
+                            })
+                    })
                     // Center: search bar — height tuned so the
                     // gpui-component Input fits inside the 36px topbar
                     // without overflowing (the input widget has its own

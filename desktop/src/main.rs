@@ -30,7 +30,7 @@ fn main() {
                         size: size(px(1280.0), px(800.0)),
                     })),
                     titlebar: Some(TitlebarOptions {
-                        title: Some("InteractiveYoutube".into()),
+                        title: Some("Koala TV".into()),
                         ..Default::default()
                     }),
                     ..Default::default()

@@ -96,7 +96,7 @@ Side effects you should be aware of:
 Two independent updaters:
 
 - **Server**: `server/services/ytdlp-updater.js` manages `./bin/yt-dlp`. Downloads on first run, `-U` every 6 h. `server/scripts/ytdlp-audit.sh` and the server itself use this binary.
-- **Desktop**: `desktop/src/services/ytdlp_updater.rs` manages `$XDG_DATA_HOME/InteractiveYoutube/bin/yt-dlp`. Same logic. libmpv is pointed at this binary via `script-opts=ytdl_hook-ytdl_path=…`.
+- **Desktop**: `desktop/src/services/ytdlp_updater.rs` manages `$XDG_DATA_HOME/KoalaTV/bin/yt-dlp`. Same logic. libmpv is pointed at this binary via `script-opts=ytdl_hook-ytdl_path=…`.
 
 Both are intentionally separate so the desktop works offline of the server.
 

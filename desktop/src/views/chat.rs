@@ -162,8 +162,9 @@ impl Render for ChatView {
             )
             .child(
                 div()
+                    .id("chat-messages")
                     .flex_1()
-                    .overflow_y_hidden()
+                    .overflow_y_scroll()
                     .px_2()
                     .py_1()
                     .child(
