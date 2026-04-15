@@ -3,7 +3,11 @@ import socket from '../services/socket';
 import { api } from '../services/api';
 
 const PING_COUNT = 5;
-const DRIFT_TOLERANCE = 4.0;
+// Sec d'écart toléré avant un re-seek. Sweet-spot pour l'iframe YouTube :
+// 4s = trop laxiste (web visiblement en retard du desktop), 1.5s = trop
+// serré (re-buffers fréquents toutes les 5-10 min, mini-glitches visibles).
+// 2.5s = écart imperceptible en pratique, peu de seeks correctifs.
+const DRIFT_TOLERANCE = 2.5;
 
 export function useTvSync(channelId) {
   const [tvState, setTvState] = useState(null);
@@ -125,10 +129,20 @@ export function useTvSync(channelId) {
     socket.on('tv:sync', onTvSync);
     socket.on('tv:refreshed', onTvRefreshed);
 
+    // Local drift check toutes les 2.5 s. Le serveur n'émet `tv:sync` que
+    // toutes les 15 s, ce qui laisse l'iframe YouTube dériver jusqu'à 15 s
+    // si le buffer est lent. On rejoue la même logique localement à partir
+    // du dernier `tvState` connu et du clockOffset, sans ping serveur.
+    const localDriftId = setInterval(() => {
+      const state = tvStateRef.current;
+      if (state) onTvSync(state);
+    }, 2500);
+
     return () => {
       socket.off('tv:state', onTvState);
       socket.off('tv:sync', onTvSync);
       socket.off('tv:refreshed', onTvRefreshed);
+      clearInterval(localDriftId);
     };
   }, [channelId]);
 

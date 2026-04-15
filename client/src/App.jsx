@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useSocket } from './hooks/useSocket';
 import { useAuth } from './hooks/useAuth';
-import { MessageSquare, MessageSquareOff, LogIn, LogOut, User, Search } from 'lucide-react';
+import { MessageSquare, MessageSquareOff, LogIn, LogOut, User, Search, Download } from 'lucide-react';
+import DownloadPage from './components/DownloadPage';
 
-const REPO_URL = 'https://github.com/Louisdelez/InteractiveYoutube';
+const REPO_URL = 'https://github.com/Louisdelez/KoalaTV';
 
 // Inline Lucide github icon — the installed lucide-react build doesn't
 // export `Github` as a named icon, so we ship the SVG ourselves.
@@ -39,6 +40,25 @@ export default function App() {
   const [showAuth, setShowAuth] = useState(false);
   const [currentChannel, setCurrentChannel] = useState('amixem');
   const [searchQuery, setSearchQuery] = useState('');
+  const [route, setRoute] = useState(
+    typeof window !== 'undefined' ? window.location.hash : ''
+  );
+
+  useEffect(() => {
+    const onHash = () => setRoute(window.location.hash);
+    window.addEventListener('hashchange', onHash);
+    return () => window.removeEventListener('hashchange', onHash);
+  }, []);
+
+  if (route === '#download') {
+    return (
+      <DownloadPage
+        onBack={() => {
+          window.location.hash = '';
+        }}
+      />
+    );
+  }
 
   return (
     <div className="app">
@@ -54,6 +74,14 @@ export default function App() {
             title="Voir sur GitHub"
           >
             <GithubIcon size={15} />
+          </a>
+          <a
+            href="#download"
+            className="top-bar-download"
+            title="Télécharger l'app desktop"
+          >
+            <Download size={13} />
+            <span>Télécharger</span>
           </a>
         </div>
         <div className="top-bar-search">
