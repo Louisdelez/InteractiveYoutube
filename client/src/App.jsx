@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useSocket } from './hooks/useSocket';
 import { useAuth } from './hooks/useAuth';
-import { MessageSquare, MessageSquareOff, LogIn, LogOut, User, Search, Download } from 'lucide-react';
+import { MessageSquare, MessageSquareOff, LogIn, LogOut, User, Search, Download, Info } from 'lucide-react';
 import DownloadPage from './components/DownloadPage';
+import AboutPage from './components/AboutPage';
 
 const REPO_URL = 'https://github.com/Louisdelez/KoalaTV';
 
@@ -60,6 +61,15 @@ export default function App() {
     );
   }
 
+  if (route === '#about') {
+    return (
+      <AboutPage
+        onBack={() => { window.location.hash = ''; }}
+        onDownload={() => { window.location.hash = '#download'; }}
+      />
+    );
+  }
+
   return (
     <div className="app">
       <div className="top-bar">
@@ -82,6 +92,14 @@ export default function App() {
           >
             <Download size={13} />
             <span>Télécharger</span>
+          </a>
+          <a
+            href="#about"
+            className="top-bar-about"
+            title="À propos du projet"
+          >
+            <Info size={13} />
+            <span>À propos</span>
           </a>
         </div>
         <div className="top-bar-search">

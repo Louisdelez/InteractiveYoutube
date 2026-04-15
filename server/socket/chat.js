@@ -3,6 +3,7 @@ const config = require('../config');
 const { redis } = require('../services/redis');
 const log = require('../services/logger');
 const metrics = require('../services/metrics');
+const { generatePseudo, generateColor } = require('../services/pseudo');
 
 /**
  * Strip control characters, zero-width spaces and bidirectional
@@ -155,10 +156,24 @@ function registerChatHandlers(io, socket, user) {
       color = user.color || '#1E90FF';
       registered = true;
     } else {
-      const stored = anonymousNames.get(socket.id);
-      username = stored || `Anonyme-${nanoid(4)}`;
-      anonymousNames.set(socket.id, username);
-      color = anonymousColors.get(socket.id) || '#888888';
+      // Fallback: animal/fruit/legume FR pseudo, never the bare "Anonyme-".
+      // The client (web + desktop) emits `chat:setAnonymousName` on connect,
+      // but a chat:message can arrive first if the user is fast or if the
+      // setAnonymousName packet got dropped during the namespace handshake.
+      // In that case we generate one server-side and stash it for the
+      // socket — same pseudo for the rest of the session.
+      let stored = anonymousNames.get(socket.id);
+      if (!stored) {
+        stored = generatePseudo();
+        anonymousNames.set(socket.id, stored);
+      }
+      username = stored;
+      let storedColor = anonymousColors.get(socket.id);
+      if (!storedColor) {
+        storedColor = generateColor();
+        anonymousColors.set(socket.id, storedColor);
+      }
+      color = storedColor;
       registered = false;
       log.debug(
         { sid: socket.id, used_stored: !!stored, username, color },

@@ -57,12 +57,17 @@ const LEGUMES = [
 
 const ALL_NAMES = [...ANIMALS, ...FRUITS, ...LEGUMES];
 
-// --- Random color generator (vibrant, readable on dark background) ---
+// Twitch's canonical default chat colour palette — 15 vibrant colours,
+// same list used server-side and on desktop. Picking from a fixed
+// palette gives the chat a recognisable look (colors consistent across
+// users) instead of a soup of random pastel HSLs.
+const TWITCH_COLORS = [
+  '#FF0000', '#0000FF', '#008000', '#B22222', '#FF7F50',
+  '#9ACD32', '#FF4500', '#2E8B57', '#DAA520', '#D2691E',
+  '#5F9EA0', '#1E90FF', '#FF69B4', '#8A2BE2', '#00FF7F',
+];
 function randomColor() {
-  const hue = Math.floor(Math.random() * 360);
-  const saturation = 60 + Math.floor(Math.random() * 30); // 60-90%
-  const lightness = 55 + Math.floor(Math.random() * 20);  // 55-75%
-  return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+  return TWITCH_COLORS[Math.floor(Math.random() * TWITCH_COLORS.length)];
 }
 
 function randomPick(arr) {

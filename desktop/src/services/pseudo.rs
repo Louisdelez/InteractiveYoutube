@@ -107,38 +107,19 @@ pub fn generate_pseudo() -> String {
     }
 }
 
-/// Vibrant HSL colour string in `#RRGGBB` form, suitable for chat
-/// usernames over a dark background. Hue random, saturation 60-90 %,
-/// lightness 55-75 %.
-pub fn generate_color() -> String {
-    let hue = (rand_u32() as f32 / u32::MAX as f32) * 360.0;
-    let sat = 60.0 + (rand_u32() as f32 / u32::MAX as f32) * 30.0;
-    let light = 55.0 + (rand_u32() as f32 / u32::MAX as f32) * 20.0;
-    hsl_to_hex(hue, sat / 100.0, light / 100.0)
-}
+/// Twitch's canonical default chat colour palette — 15 vibrant colours,
+/// same list used server-side and on the web. Picking from a fixed
+/// palette keeps the chat coherent (recognisable Twitch-look) instead
+/// of a random pastel HSL soup.
+const TWITCH_COLORS: &[&str] = &[
+    "#FF0000", "#0000FF", "#008000", "#B22222", "#FF7F50",
+    "#9ACD32", "#FF4500", "#2E8B57", "#DAA520", "#D2691E",
+    "#5F9EA0", "#1E90FF", "#FF69B4", "#8A2BE2", "#00FF7F",
+];
 
-fn hsl_to_hex(h: f32, s: f32, l: f32) -> String {
-    let c = (1.0 - (2.0 * l - 1.0).abs()) * s;
-    let h_seg = h / 60.0;
-    let x = c * (1.0 - (h_seg.rem_euclid(2.0) - 1.0).abs());
-    let (r1, g1, b1) = if h_seg < 1.0 {
-        (c, x, 0.0)
-    } else if h_seg < 2.0 {
-        (x, c, 0.0)
-    } else if h_seg < 3.0 {
-        (0.0, c, x)
-    } else if h_seg < 4.0 {
-        (0.0, x, c)
-    } else if h_seg < 5.0 {
-        (x, 0.0, c)
-    } else {
-        (c, 0.0, x)
-    };
-    let m = l - c / 2.0;
-    let r = ((r1 + m) * 255.0).round().clamp(0.0, 255.0) as u8;
-    let g = ((g1 + m) * 255.0).round().clamp(0.0, 255.0) as u8;
-    let b = ((b1 + m) * 255.0).round().clamp(0.0, 255.0) as u8;
-    format!("#{:02X}{:02X}{:02X}", r, g, b)
+pub fn generate_color() -> String {
+    let i = (rand_u32() as usize) % TWITCH_COLORS.len();
+    TWITCH_COLORS[i].to_string()
 }
 
 static SESSION_PSEUDO: OnceLock<String> = OnceLock::new();

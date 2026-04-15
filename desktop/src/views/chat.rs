@@ -26,6 +26,9 @@ pub struct ChatView {
     /// Lazy image cache keyed by emoji unicode-code (e.g. `1f600`). Loads from
     /// `assets/emoji-png/{code}.png` (Apple style, 64×64) on first request.
     emoji_cache: HashMap<String, Arc<Image>>,
+    /// Scroll handle for the messages list — used to auto-scroll to the
+    /// latest message after every push / replace.
+    messages_scroll: ScrollHandle,
     #[allow(dead_code)]
     _subs: Vec<Subscription>,
 }
@@ -71,7 +74,17 @@ impl ChatView {
             show_emoji: false,
             emoji_category: 0,
             emoji_cache: HashMap::new(),
+            messages_scroll: ScrollHandle::new(),
             _subs: vec![sub],
+        }
+    }
+
+    /// Snap the message list to the latest message. Called after every
+    /// new message (incoming or outgoing) — Twitch-style auto-follow.
+    fn scroll_to_bottom(&self) {
+        let visible = self.messages.len().min(RENDER_WINDOW);
+        if visible > 0 {
+            self.messages_scroll.scroll_to_item(visible - 1);
         }
     }
 
@@ -88,6 +101,7 @@ impl ChatView {
                 timestamp: 0,
             });
         }
+        self.scroll_to_bottom();
     }
 
     pub fn push_message(&mut self, username: String, text: String, color: String) {
@@ -102,6 +116,7 @@ impl ChatView {
         while self.messages.len() > MAX_MESSAGES {
             self.messages.pop_front();
         }
+        self.scroll_to_bottom();
     }
 
     pub fn set_viewer_count(&mut self, count: usize) {
@@ -161,54 +176,58 @@ impl Render for ChatView {
                     )
             )
             .child(
-                div()
-                    .id("chat-messages")
-                    .flex_1()
-                    .overflow_y_scroll()
-                    .px_2()
-                    .py_1()
-                    .child(
-                        if self.messages.is_empty() {
-                            div()
-                                .flex()
-                                .items_center()
-                                .justify_center()
-                                .h_full()
-                                .text_xs()
-                                .text_color(rgb(0x666666))
-                                .child("Pas encore de messages.")
-                        } else {
-                            div()
-                                .flex()
-                                .flex_col()
-                                .gap(px(2.0))
-                                .children(
-                                    self.messages.iter().rev().take(RENDER_WINDOW).collect::<Vec<_>>().into_iter().rev().map(|msg| {
-                                        let color = parse_hex_color(&msg.color).unwrap_or(0xaaaaaa);
+                if self.messages.is_empty() {
+                    div()
+                        .id("chat-messages")
+                        .flex_1()
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .text_xs()
+                        .text_color(rgb(0x666666))
+                        .child("Pas encore de messages.")
+                } else {
+                    // Messages rendered as DIRECT children of the scrollable
+                    // div — required so `track_scroll(&messages_scroll)` can
+                    // locate per-message child bounds and `scroll_to_item`
+                    // can target the last one. With a wrapper child the
+                    // handle would only see "1 child" and never scroll.
+                    div()
+                        .id("chat-messages")
+                        .track_scroll(&self.messages_scroll)
+                        .flex()
+                        .flex_col()
+                        .flex_1()
+                        .overflow_y_scroll()
+                        .gap(px(2.0))
+                        .px_2()
+                        .py_1()
+                        .children(
+                            self.messages.iter().rev().take(RENDER_WINDOW).collect::<Vec<_>>().into_iter().rev().map(|msg| {
+                                let color = parse_hex_color(&msg.color).unwrap_or(0xaaaaaa);
+                                div()
+                                    .px_2()
+                                    .py(px(2.0))
+                                    .text_xs()
+                                    .child(
                                         div()
-                                            .px_2()
-                                            .py(px(2.0))
-                                            .text_xs()
+                                            .flex()
+                                            .gap_1()
                                             .child(
                                                 div()
-                                                    .flex()
-                                                    .gap_1()
-                                                    .child(
-                                                        div()
-                                                            .font_weight(FontWeight::SEMIBOLD)
-                                                            .text_color(rgb(color))
-                                                            .child(msg.username.clone())
-                                                    )
-                                                    .child(
-                                                        div()
-                                                            .text_color(rgb(0xefeff1))
-                                                            .child(msg.text.clone())
-                                                    )
+                                                    .font_weight(FontWeight::SEMIBOLD)
+                                                    .text_color(rgb(color))
+                                                    .child(msg.username.clone())
                                             )
-                                    }).collect::<Vec<_>>()
-                                )
-                        }
-                    )
+                                            .child(
+                                                div()
+                                                    .text_color(rgb(0xefeff1))
+                                                    .child(msg.text.clone())
+                                            )
+                                    )
+                            }).collect::<Vec<_>>()
+                        )
+                }
             )
             .child({
                 let show_emoji = self.show_emoji;
