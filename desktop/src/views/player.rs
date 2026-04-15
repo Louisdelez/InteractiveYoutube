@@ -8,8 +8,11 @@ use crate::views::icons::{IconCache, IconName};
 
 #[cfg(target_os = "linux")]
 use crate::views::backup_player::BackupPlayer;
+#[cfg(target_os = "linux")]
 use crate::views::channel_badge::ChannelBadge;
+#[cfg(target_os = "linux")]
 use crate::views::loading_overlay::LoadingOverlay;
+#[cfg(target_os = "linux")]
 use crate::views::memory_cache::{MemorizedChannel, MemoryCache};
 #[cfg(target_os = "linux")]
 use crate::views::popup_menu::{MenuEvent, MenuKind, PopupMenu};
@@ -1168,6 +1171,7 @@ impl PlayerView {
                         self.loading_pre_path = mpv.get_property::<String>("path").ok();
                     }
                 }
+                #[cfg(target_os = "linux")]
                 if self.loading_pre_path_backup.is_none() {
                     self.loading_pre_path_backup = self
                         .backup

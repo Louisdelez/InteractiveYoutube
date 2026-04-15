@@ -112,6 +112,7 @@ Each channel has a shuffled playlist and a `tvStartedAt` timestamp. The currentl
 - [Server](docs/SERVER.md) — HTTP API, Socket.IO events, services, cron
 - [Web client](docs/CLIENT.md) — components, hooks, sync logic, fallback
 - [Desktop app](docs/DESKTOP.md) — GPUI + libmpv, dual-mpv pattern, X11
+- [Cross-platform status](docs/CROSS_PLATFORM.md) — Linux / Windows / macOS (Intel + Apple Silicon) plan
 - [Operations](docs/OPERATIONS.md) — Docker, PM2, nginx, env, load tests
 
 ## License

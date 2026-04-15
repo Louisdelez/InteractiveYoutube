@@ -1,6 +1,6 @@
 # Desktop app reference
 
-Rust (edition 2021) + [GPUI](https://www.gpui.rs) (Zed's UI framework) + [libmpv2](https://crates.io/crates/libmpv2). Linux-first (X11); the codebase is ready for Wayland but the X11-specific features (popup menus, tooltip overlay, badge, backup player) are gated on `cfg(target_os = "linux")`.
+Rust (edition 2021) + [GPUI](https://www.gpui.rs) (Zed's UI framework) + [libmpv2](https://crates.io/crates/libmpv2). Linux-first (X11); the codebase compiles on Windows and macOS via `cfg(target_os = "linux")` gates but the in-window mpv embed and native overlays (popup menus, tooltip, badge, backup player) are Linux-only for now. See [CROSS_PLATFORM.md](CROSS_PLATFORM.md) for the per-platform status and roadmap.
 
 ## Why a native app?
 

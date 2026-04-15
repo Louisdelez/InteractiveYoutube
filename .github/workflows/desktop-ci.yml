@@ -1,0 +1,65 @@
+name: Desktop CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'desktop/**'
+      - '.github/workflows/desktop-ci.yml'
+  pull_request:
+    paths:
+      - 'desktop/**'
+      - '.github/workflows/desktop-ci.yml'
+
+jobs:
+  check:
+    name: cargo check (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Linux x86_64
+            os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+            setup: sudo apt-get update && sudo apt-get install -y libmpv-dev libx11-dev libxft-dev
+          - name: macOS Intel
+            os: macos-13
+            target: x86_64-apple-darwin
+            setup: brew install mpv
+          - name: macOS Apple Silicon
+            os: macos-14
+            target: aarch64-apple-darwin
+            setup: brew install mpv
+          - name: Windows x86_64
+            os: windows-latest
+            target: x86_64-pc-windows-msvc
+            setup: echo "libmpv setup TBD (see docs/CROSS_PLATFORM.md)"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: System deps
+        run: ${{ matrix.setup }}
+        shell: bash
+
+      - name: Cache cargo registry + target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            desktop/target
+          key: cargo-${{ matrix.target }}-${{ hashFiles('desktop/Cargo.lock') }}
+          restore-keys: cargo-${{ matrix.target }}-
+
+      - name: cargo check
+        working-directory: desktop
+        run: cargo check --target ${{ matrix.target }}
+        # Windows is allowed to fail until libmpv setup is wired in the runner.
+        continue-on-error: ${{ matrix.name == 'Windows x86_64' }}
