@@ -27,3 +27,6 @@ desktop/target/debian/
 .idea/
 *.swp
 .DS_Store
+
+# Claude Code project memory (local context, not shared)
+CLAUDE.md
