@@ -35,9 +35,11 @@ pub enum ServerEvent {
         username: String,
         text: String,
         color: String,
+        timestamp: u64,
     },
-    /// Full history dump (replaces local buffer).
-    ChatHistory(Vec<(String, String, String)>),
+    /// Full history dump (replaces local buffer). Tuples =
+    /// (username, text, color, timestamp_ms).
+    ChatHistory(Vec<(String, String, String, u64)>),
     /// Server wiped all chat history (daily 3am cron) — drop local buffer.
     ChatCleared,
     ViewerCount {
@@ -132,6 +134,7 @@ fn run_socket_loop(events: Sender<ServerEvent>, cmd_rx: Receiver<ClientCommand>)
                                         username: parsed.0,
                                         text: parsed.1,
                                         color: parsed.2,
+                                        timestamp: parsed.3,
                                     });
                                 }
                             }
@@ -143,7 +146,7 @@ fn run_socket_loop(events: Sender<ServerEvent>, cmd_rx: Receiver<ClientCommand>)
                 if let Payload::Text(values) = payload {
                     if let Some(v) = values.first() {
                         if let Some(arr) = v.as_array() {
-                            let history: Vec<(String, String, String)> = arr
+                            let history: Vec<(String, String, String, u64)> = arr
                                 .iter()
                                 .filter_map(parse_chat_message)
                                 .collect();
@@ -239,7 +242,7 @@ fn run_socket_loop(events: Sender<ServerEvent>, cmd_rx: Receiver<ClientCommand>)
     }
 }
 
-fn parse_chat_message(v: &Value) -> Option<(String, String, String)> {
+fn parse_chat_message(v: &Value) -> Option<(String, String, String, u64)> {
     let username = v.get("username").and_then(|x| x.as_str())?.to_string();
     let text = v.get("text").and_then(|x| x.as_str())?.to_string();
     let color = v
@@ -247,5 +250,8 @@ fn parse_chat_message(v: &Value) -> Option<(String, String, String)> {
         .and_then(|x| x.as_str())
         .unwrap_or("#999")
         .to_string();
-    Some((username, text, color))
+    // Server emits epoch ms in `timestamp`; fall back to 0 if missing
+    // (we'll display "now" client-side).
+    let timestamp = v.get("timestamp").and_then(|x| x.as_u64()).unwrap_or(0);
+    Some((username, text, color, timestamp))
 }
