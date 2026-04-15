@@ -1,0 +1,94 @@
+.fallback-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  background: #0e0e10;
+  padding: 24px;
+}
+
+.fallback-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  max-width: 420px;
+  text-align: center;
+}
+
+.fallback-icon {
+  color: #555;
+}
+
+.fallback-title {
+  color: #efeff1;
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.fallback-text {
+  color: #888;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.fallback-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  margin-top: 8px;
+}
+
+.fallback-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border-radius: 6px;
+  text-decoration: none;
+  font-size: 0.85rem;
+  font-weight: 500;
+  transition: background 0.2s, transform 0.1s;
+  cursor: pointer;
+}
+
+.fallback-btn:active {
+  transform: scale(0.98);
+}
+
+.fallback-btn-youtube {
+  background: #ff0000;
+  color: white;
+}
+
+.fallback-btn-youtube:hover {
+  background: #cc0000;
+}
+
+.fallback-timecode {
+  font-family: monospace;
+  font-size: 0.75rem;
+  opacity: 0.8;
+  background: rgba(0, 0, 0, 0.3);
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+
+.fallback-btn-download {
+  background: #9b59b6;
+  color: white;
+}
+
+.fallback-btn-download:hover {
+  background: #8e44ad;
+}
+
+.fallback-hint {
+  color: #555;
+  font-size: 0.75rem;
+  margin: 0;
+}

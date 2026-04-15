@@ -1,0 +1,24 @@
+# Dependencies
+node_modules/
+
+# Secrets
+.env
+
+# Build output
+client/dist/
+**/target/
+
+# Runtime data (cached playlists, DB)
+server/data/*.json
+server/data/*.db*
+logs/
+.playwright-mcp/
+
+# Auto-managed binary (downloaded at boot by ytdlp-updater)
+bin/
+
+# Editors
+.vscode/
+.idea/
+*.swp
+.DS_Store

@@ -1,0 +1,57 @@
+config:
+  target: "http://localhost:4500"
+  phases:
+    # Ramp up: 0 to 100 users over 30s
+    - duration: 30
+      arrivalRate: 1
+      rampTo: 100
+      name: "Ramp up"
+    # Sustained load: 100 users/s for 60s
+    - duration: 60
+      arrivalRate: 100
+      name: "Sustained load"
+    # Spike: 500 users/s for 15s
+    - duration: 15
+      arrivalRate: 500
+      name: "Spike"
+  engines:
+    socketio-v3:
+      transports: ["websocket"]
+  socketio:
+    transports: ["websocket"]
+
+scenarios:
+  # Viewer: connects, watches, receives sync, disconnects after 30-60s
+  - name: "Viewer (passive)"
+    weight: 70
+    engine: socketio-v3
+    flow:
+      - emit:
+          channel: "chat:setAnonymousName"
+          data:
+            name: "Viewer-{{ $randomString() }}"
+      # Listen for events for 30-60s
+      - think: 30
+      - loop:
+          - think: 5
+        count: 6
+
+  # Chatter: connects, sends messages, disconnects
+  - name: "Active chatter"
+    weight: 30
+    engine: socketio-v3
+    flow:
+      - emit:
+          channel: "chat:setAnonymousName"
+          data:
+            name: "Chatter-{{ $randomString() }}"
+      - think: 2
+      # Send 5 messages with 3s delay between
+      - loop:
+          - emit:
+              channel: "chat:message"
+              data:
+                text: "Load test message {{ $randomString() }} at {{ $timestamp }}"
+          - think: 3
+        count: 5
+      - think: 10

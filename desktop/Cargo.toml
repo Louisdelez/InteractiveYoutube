@@ -1,0 +1,26 @@
+[package]
+name = "interactiveyoutube-desktop"
+version = "1.0.0"
+edition = "2021"
+
+[dependencies]
+gpui = { git = "https://github.com/zed-industries/zed" }
+gpui_platform = { git = "https://github.com/zed-industries/zed", features = ["font-kit", "x11", "wayland", "runtime_shaders"] }
+gpui-component = { git = "https://github.com/longbridge/gpui-component" }
+libmpv2 = "5.0"
+raw-window-handle = { version = "0.6", features = ["std"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+url = "2"
+futures-util = "0.3"
+anyhow = "1"
+reqwest = { version = "0.12", features = ["blocking", "json", "cookies", "rustls-tls"], default-features = false }
+rust_socketio = "0.6"
+resvg = { version = "0.44", default-features = false }
+tiny-skia = "0.11"
+usvg = { version = "0.44", default-features = false }
+png = "0.17"
+image = { version = "0.25.10", default-features = false, features = ["png", "jpeg"] }
+
+[target."cfg(target_os = \"linux\")".dependencies]
+x11-dl = "2"

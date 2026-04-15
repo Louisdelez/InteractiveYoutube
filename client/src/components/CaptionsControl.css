@@ -1,0 +1,73 @@
+.captions-control {
+  position: absolute;
+  bottom: 12px;
+  right: 12px;
+  z-index: 5;
+}
+
+.captions-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0, 0, 0, 0.6);
+  color: #aaa;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(4px);
+  transition: background 0.2s, color 0.2s;
+}
+
+.captions-btn:hover {
+  background: rgba(0, 0, 0, 0.8);
+  color: white;
+}
+
+.captions-btn.active {
+  color: #9b59b6;
+}
+
+.captions-menu {
+  position: absolute;
+  bottom: 44px;
+  right: 0;
+  background: rgba(0, 0, 0, 0.85);
+  border-radius: 8px;
+  padding: 4px 0;
+  min-width: 140px;
+  max-height: 250px;
+  overflow-y: auto;
+  backdrop-filter: blur(8px);
+  display: flex;
+  flex-direction: column;
+}
+
+.captions-option {
+  background: none;
+  border: none;
+  color: #ccc;
+  padding: 8px 16px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  text-align: left;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s;
+}
+
+.captions-option:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+}
+
+.captions-option.selected {
+  color: #9b59b6;
+  font-weight: 600;
+}
+
+.captions-divider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.15);
+  margin: 2px 8px;
+}

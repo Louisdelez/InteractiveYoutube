@@ -1,0 +1,36 @@
+.chat-message {
+  padding: 4px 12px;
+  line-height: 1.4;
+  word-wrap: break-word;
+  font-size: 0.875rem;
+}
+
+.chat-message:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.chat-time {
+  color: #666;
+  font-size: 0.75rem;
+  margin-right: 6px;
+}
+
+.chat-username {
+  font-weight: 600;
+  margin-right: 6px;
+  cursor: default;
+}
+
+.chat-username-registered {
+  font-weight: 700;
+}
+
+.chat-badge {
+  font-size: 0.7rem;
+  margin-right: 3px;
+  vertical-align: middle;
+}
+
+.chat-text {
+  color: #efeff1;
+}

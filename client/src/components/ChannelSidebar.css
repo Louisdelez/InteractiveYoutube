@@ -1,0 +1,91 @@
+.channel-sidebar {
+  width: 56px;
+  height: 100%;
+  background: #0e0e10;
+  border-right: 1px solid #2d2d30;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
+  outline: none;
+  overflow: hidden;
+}
+
+.channel-list {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  flex: 1;
+  width: 100%;
+}
+
+.channel-list::-webkit-scrollbar {
+  width: 3px;
+}
+
+.channel-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.channel-list::-webkit-scrollbar-thumb {
+  background: #333;
+  border-radius: 2px;
+}
+
+.channel-item {
+  width: 40px;
+  height: 40px;
+  min-height: 40px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  background: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  padding: 0;
+  transition: border-color 0.2s, transform 0.2s;
+  flex-shrink: 0;
+}
+
+.channel-item:hover {
+  border-color: #9b59b6;
+  transform: scale(1.1);
+}
+
+.channel-item.active {
+  border-color: #9b59b6;
+}
+
+.channel-item.active::before {
+  content: '';
+  position: absolute;
+  left: -8px;
+  width: 4px;
+  height: 20px;
+  background: white;
+  border-radius: 0 4px 4px 0;
+}
+
+.channel-item.focused {
+  border-color: #bf94ff;
+  box-shadow: 0 0 6px rgba(155, 89, 182, 0.4);
+}
+
+.channel-focus-arrow {
+  position: absolute;
+  left: -14px;
+  color: #bf94ff;
+}
+
+.channel-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+}

@@ -1,0 +1,12 @@
+.viewer-count {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #bf94ff;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.viewer-count svg {
+  stroke: #bf94ff;
+}
