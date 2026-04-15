@@ -83,7 +83,10 @@ export default function App() {
       <div className="top-bar">
         <div className="top-bar-brand">
           <img src="/koala-tv.png" alt="" className="top-bar-logo" />
-          <span className="top-bar-title">Koala TV</span>
+          <span className="top-bar-title">
+            Koala TV
+            <span className="top-bar-lite" title="Version navigateur — moins de features que l'app desktop"> Lite</span>
+          </span>
           <a
             href={REPO_URL}
             target="_blank"

@@ -48,6 +48,19 @@ body {
   color: #9b59b6;
 }
 
+.top-bar-lite {
+  margin-left: 4px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(155, 89, 182, 0.18);
+  color: #d4afe6;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  vertical-align: middle;
+}
+
 .top-bar-github {
   display: inline-flex;
   align-items: center;

@@ -1722,6 +1722,16 @@ impl PlayerView {
     fn apply_geometry(&mut self, x: i32, y: i32, width: u32, height: u32) {
         let changed = self.last_area != Some((x, y, width, height));
         if changed {
+            // Detect a "size change" (vs. a pure move). Resizing the X11
+            // child forces mpv to reconfigure its GL surface, which can
+            // leave audio ~50-150 ms ahead of video on `video-sync=audio`.
+            // After the resize we issue a 0-second exact seek to force a
+            // full A/V buffer rebuild from the current position — the
+            // glitch is hidden inside the resize itself.
+            let size_changed = self
+                .last_area
+                .map(|(_, _, ow, oh)| ow != width || oh != height)
+                .unwrap_or(true);
             self.last_area = Some((x, y, width, height));
             unsafe {
                 (self.xlib.XMoveResizeWindow)(self.display, self.child_window, x, y, width, height);
@@ -1731,6 +1741,18 @@ impl PlayerView {
             // so that show()/hide() doesn't shift the visible area.
             if let Some(b) = self.backup.as_ref() {
                 b.set_geometry(x, y, width, height);
+            }
+            if size_changed {
+                if let Ok(mpv) = self.mpv.lock() {
+                    if let Ok(pos) = mpv.get_property::<f64>("time-pos") {
+                        // Seek to current pos = full A/V resync, no
+                        // perceptible position change.
+                        let _ = mpv.command(
+                            "seek",
+                            &[&format!("{}", pos), "absolute+exact"],
+                        );
+                    }
+                }
             }
         }
     }
