@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=Koala TV
+Comment=Synced multi-channel YouTube TV
+Exec=koala-tv
+Icon=koala-tv
+Terminal=false
+Type=Application
+Categories=AudioVideo;Video;Player;

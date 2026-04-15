@@ -24,3 +24,18 @@ image = { version = "0.25.10", default-features = false, features = ["png", "jpe
 
 [target."cfg(target_os = \"linux\")".dependencies]
 x11-dl = "2"
+
+[package.metadata.deb]
+name = "koala-tv"
+maintainer = "Louis Delez <loicdelez.ch@gmail.com>"
+copyright = "2026, Louis Delez"
+license-file = ["../LICENSE", "0"]
+extended-description = "Koala TV desktop client: synced multi-channel YouTube TV with live chat, built on Rust + GPUI + libmpv. https://github.com/Louisdelez/KoalaTV"
+section = "video"
+priority = "optional"
+depends = "libc6, libmpv2 | libmpv1, libx11-6, libxft2"
+assets = [
+  ["target/release/koala-tv-desktop", "usr/bin/koala-tv", "755"],
+  ["assets/koala-tv.png", "usr/share/icons/hicolor/256x256/apps/koala-tv.png", "644"],
+  ["debian/koala-tv.desktop", "usr/share/applications/koala-tv.desktop", "644"],
+]
