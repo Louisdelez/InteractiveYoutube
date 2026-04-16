@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, History, Star, Tv } from 'lucide-react';
 import { api } from '../services/api';
 import './ChannelSidebar.css';
 
@@ -59,34 +59,70 @@ const CHANNELS_FALLBACK = [
 ].sort((a, b) => a.name.localeCompare(b.name, 'fr'));
 // Note: the fetched list is sorted at fetch-time; this const is the fallback.
 
-export default function ChannelSidebar({ currentChannel, onChannelChange, searchQuery = '' }) {
+export default function ChannelSidebar({
+  channels: channelsProp,
+  currentChannel,
+  onChannelChange,
+  searchQuery = '',
+  history = [],
+  favorites = [],
+  onToggleFavorite,
+}) {
   const [focusIndex, setFocusIndex] = useState(-1);
-  const [channels, setChannels] = useState(CHANNELS_FALLBACK);
   const listRef = useRef(null);
   const itemRefs = useRef([]);
 
-  // Authoritative channel list lives on the server (config.js). Fetch it on
-  // mount so adding/removing a channel server-side propagates without a
-  // client rebuild. Falls back to the bundled list if the API is down.
-  useEffect(() => {
-    let alive = true;
-    api.get('/api/tv/channels')
-      .then((data) => {
-        if (!alive || !Array.isArray(data) || data.length === 0) return;
-        const sorted = [...data].sort((a, b) =>
-          a.name.localeCompare(b.name, 'fr')
-        );
-        setChannels(sorted);
-      })
-      .catch(() => { /* keep fallback */ });
-    return () => { alive = false; };
-  }, []);
+  // App.jsx is the source of truth for the channel list. If it's still
+  // empty (early mount, offline), fall back to the bundled list so the
+  // sidebar never renders empty.
+  const channels = useMemo(
+    () => (channelsProp && channelsProp.length > 0 ? channelsProp : CHANNELS_FALLBACK),
+    [channelsProp]
+  );
+  const byId = useMemo(() => {
+    const m = new Map();
+    for (const c of channels) m.set(c.id, c);
+    return m;
+  }, [channels]);
+
+  // History items: resolve ids against the current channel list, skip
+  // any stale ids. Cap at 5.
+  const historyItems = useMemo(
+    () =>
+      history
+        .map((id) => byId.get(id))
+        .filter(Boolean)
+        .slice(0, 5),
+    [history, byId]
+  );
+
+  // Favourite items: same resolution, sorted alphabetically.
+  const favoriteItems = useMemo(
+    () =>
+      favorites
+        .map((id) => byId.get(id))
+        .filter(Boolean)
+        .sort((a, b) => a.name.localeCompare(b.name, 'fr')),
+    [favorites, byId]
+  );
 
   const filtered = useMemo(() => {
     if (!searchQuery.trim()) return channels;
     const q = searchQuery.toLowerCase();
     return channels.filter((ch) => ch.name.toLowerCase().includes(q));
   }, [searchQuery, channels]);
+
+  // Flat list of all rendered items, in order: history, favoris, all.
+  // Used by arrow-key navigation so it traverses every visible row.
+  const allRendered = useMemo(() => {
+    const rows = [];
+    if (!searchQuery.trim()) {
+      for (const c of historyItems) rows.push(c);
+      for (const c of favoriteItems) rows.push(c);
+    }
+    for (const c of filtered) rows.push(c);
+    return rows;
+  }, [historyItems, favoriteItems, filtered, searchQuery]);
 
   // Scroll focused item into view
   useEffect(() => {
@@ -103,31 +139,70 @@ export default function ChannelSidebar({ currentChannel, onChannelChange, search
   const handleKeyDown = useCallback((e) => {
     if (e.key === 'ArrowDown') {
       e.preventDefault();
-      setFocusIndex((prev) => Math.min(prev + 1, filtered.length - 1));
+      setFocusIndex((prev) => Math.min(prev + 1, allRendered.length - 1));
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
       setFocusIndex((prev) => Math.max(prev - 1, 0));
-    } else if (e.key === 'Enter' && focusIndex >= 0 && focusIndex < filtered.length) {
+    } else if (e.key === 'Enter' && focusIndex >= 0 && focusIndex < allRendered.length) {
       e.preventDefault();
-      onChannelChange(filtered[focusIndex].id);
+      onChannelChange(allRendered[focusIndex].id);
     }
-  }, [focusIndex, filtered, onChannelChange]);
+  }, [focusIndex, allRendered, onChannelChange]);
+
+  // Render one channel row. Right-click toggles favourite. Click switches.
+  let rowIndex = -1;
+  const renderRow = (ch, keyPrefix) => {
+    rowIndex += 1;
+    const i = rowIndex;
+    const isFav = favorites.includes(ch.id);
+    return (
+      <button
+        key={`${keyPrefix}-${ch.id}`}
+        ref={(el) => (itemRefs.current[i] = el)}
+        className={`channel-item${ch.id === currentChannel ? ' active' : ''}${i === focusIndex ? ' focused' : ''}`}
+        title={`${ch.name}${isFav ? ' ★' : ''}\nClic droit: ${isFav ? 'retirer des' : 'ajouter aux'} favoris`}
+        onClick={() => onChannelChange(ch.id)}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          if (onToggleFavorite) onToggleFavorite(ch.id);
+        }}
+      >
+        {i === focusIndex && <ChevronRight size={12} className="channel-focus-arrow" />}
+        <img src={ch.avatar} alt={ch.name} className="channel-avatar" />
+        {isFav && <Star size={10} className="channel-fav-badge" fill="currentColor" />}
+      </button>
+    );
+  };
+
+  const showSections = !searchQuery.trim();
 
   return (
     <div className="channel-sidebar" tabIndex={0} onKeyDown={handleKeyDown}>
       <div className="channel-list" ref={listRef}>
-        {filtered.map((ch, i) => (
-          <button
-            key={ch.id}
-            ref={(el) => (itemRefs.current[i] = el)}
-            className={`channel-item${ch.id === currentChannel ? ' active' : ''}${i === focusIndex ? ' focused' : ''}`}
-            title={ch.name}
-            onClick={() => onChannelChange(ch.id)}
-          >
-            {i === focusIndex && <ChevronRight size={12} className="channel-focus-arrow" />}
-            <img src={ch.avatar} alt={ch.name} className="channel-avatar" />
-          </button>
-        ))}
+        {showSections && historyItems.length > 0 && (
+          <>
+            <div className="channel-section-header" title="Historique — clic droit sur une chaîne pour la mettre en favori">
+              <History size={12} />
+            </div>
+            {historyItems.map((ch) => renderRow(ch, 'h'))}
+            <div className="channel-section-sep" />
+          </>
+        )}
+        {showSections && favoriteItems.length > 0 && (
+          <>
+            <div className="channel-section-header" title="Favoris">
+              <Star size={12} />
+            </div>
+            {favoriteItems.map((ch) => renderRow(ch, 'f'))}
+            <div className="channel-section-sep" />
+          </>
+        )}
+        {showSections && (
+          <div className="channel-section-header" title="Toutes les chaînes">
+            <Tv size={12} />
+          </div>
+        )}
+        {filtered.map((ch) => renderRow(ch, 'a'))}
       </div>
     </div>
   );

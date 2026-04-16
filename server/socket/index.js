@@ -149,7 +149,10 @@ function setupSocketIO(httpServer) {
   });
 
   io.on('connection', async (socket) => {
-    const defaultChannel = config.CHANNELS[0].id;
+    // Pick a random channel per connection so every fresh client lands on
+    // a different chaîne instead of always the first in the config list.
+    const defaultChannel =
+      config.CHANNELS[Math.floor(Math.random() * config.CHANNELS.length)].id;
 
     // Register chat first (it consumes socket.user). TV handler
     // registers its own switchChannel listener; the count update

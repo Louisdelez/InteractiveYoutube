@@ -1,0 +1,57 @@
+.channel-badge {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px 6px 6px;
+  background: rgba(15, 15, 18, 0.7);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  z-index: 6;
+  /* Container non-interactive; only the star button accepts clicks. */
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+
+.channel-badge-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.channel-badge-name {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #efeff1;
+  white-space: nowrap;
+  letter-spacing: 0.01em;
+}
+
+.channel-badge-star {
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  margin-left: 2px;
+  background: transparent;
+  border: none;
+  border-radius: 50%;
+  color: #9a9a9e;
+  cursor: pointer;
+  transition: color 0.15s ease, background 0.15s ease, transform 0.05s ease;
+}
+.channel-badge-star:hover {
+  color: #f5c518;
+  background: rgba(255, 255, 255, 0.08);
+}
+.channel-badge-star:active { transform: scale(0.9); }
+.channel-badge-star.is-fav { color: #f5c518; }
+.channel-badge-star.is-fav:hover { color: #ffd83c; }

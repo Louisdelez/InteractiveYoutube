@@ -399,9 +399,9 @@ impl AppView {
                                         // "different video → reload" internally.
                                         player_u.update(cx, |p, cx| p.load_state(&state, cx));
                                     }
-                                    ServerEvent::ChatMessage { username, text, color, timestamp } => {
+                                    ServerEvent::ChatMessage { username, text, color, time } => {
                                         chat_u.update(cx, |c, cx| {
-                                            c.push_message(username, text, color, timestamp);
+                                            c.push_message(username, text, color, time);
                                             cx.notify();
                                         });
                                     }

@@ -92,29 +92,29 @@ impl ChatView {
     }
 
     /// Replace the entire history (called on chat:history from server).
-    pub fn replace_messages(&mut self, history: Vec<(String, String, String, u64)>) {
+    pub fn replace_messages(&mut self, history: Vec<(String, String, String, String)>) {
         self.messages.clear();
-        for (username, text, color, timestamp) in history.into_iter().rev().take(MAX_MESSAGES).rev() {
+        for (username, text, color, time) in history.into_iter().rev().take(MAX_MESSAGES).rev() {
             self.messages.push_back(ChatMessage {
                 id: String::new(),
                 username,
                 text,
                 color,
                 registered: false,
-                timestamp,
+                time,
             });
         }
         self.scroll_to_bottom();
     }
 
-    pub fn push_message(&mut self, username: String, text: String, color: String, timestamp: u64) {
+    pub fn push_message(&mut self, username: String, text: String, color: String, time: String) {
         self.messages.push_back(ChatMessage {
             id: String::new(),
             username,
             text,
             color,
             registered: false,
-            timestamp,
+            time,
         });
         while self.messages.len() > MAX_MESSAGES {
             self.messages.pop_front();
@@ -224,7 +224,7 @@ impl Render for ChatView {
                         .children(
                             self.messages.iter().rev().take(RENDER_WINDOW).collect::<Vec<_>>().into_iter().rev().map(|msg| {
                                 let color = parse_hex_color(&msg.color).unwrap_or(0xaaaaaa);
-                                let time = format_chat_time(msg.timestamp);
+                                let time = msg.time.clone();
                                 div()
                                     .px_2()
                                     .py(px(2.0))
@@ -440,29 +440,6 @@ impl Render for ChatView {
                 )
             })
     }
-}
-
-/// Format a chat message's epoch-ms timestamp as `HH:MM` in the local
-/// timezone. Mirrors the web's `Intl.DateTimeFormat('fr-FR', {hour, minute})`.
-/// Falls back to the current time if the server didn't send a timestamp.
-fn format_chat_time(ts_ms: u64) -> String {
-    use std::time::{SystemTime, UNIX_EPOCH};
-    let secs = if ts_ms == 0 {
-        SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map(|d| d.as_secs())
-            .unwrap_or(0)
-    } else {
-        ts_ms / 1000
-    };
-    // Local timezone offset (seconds east of UTC), via libc.
-    // SAFETY: localtime_r is thread-safe and standard on Unix; on
-    // Windows we'd need a different path but the desktop is Linux-only
-    // for now.
-    let mut tm: libc::tm = unsafe { std::mem::zeroed() };
-    let t = secs as libc::time_t;
-    unsafe { libc::localtime_r(&t, &mut tm); }
-    format!("{:02}:{:02}", tm.tm_hour, tm.tm_min)
 }
 
 fn parse_hex_color(s: &str) -> Option<u32> {

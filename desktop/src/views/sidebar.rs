@@ -74,13 +74,19 @@ impl SidebarView {
             Arc::new(Image::from_bytes(ImageFormat::Jpeg, AVATAR_PIERRE_CHABRIER.to_vec())),
         );
 
-        // Default to "amixem" so the sidebar selection matches the channel the
-        // server sends state for at startup. Falls back to index 0 if amixem
-        // isn't present (e.g. server returned a different list).
-        let selected = channels
-            .iter()
-            .position(|c| c.id == "amixem")
-            .unwrap_or(0);
+        // Pick a random initial channel so each launch lands on a
+        // different chaîne. The server also randomises per connection
+        // (see server/socket/index.js), so this aligns client + server.
+        let selected = if channels.is_empty() {
+            0
+        } else {
+            // Pseudo-random: nanosecond timestamp mod channels.len().
+            let nanos = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.subsec_nanos() as usize)
+                .unwrap_or(0);
+            nanos % channels.len()
+        };
 
         Self {
             channels,
@@ -154,10 +160,30 @@ impl SidebarView {
             new_channels.iter().map(|c| c.id.as_str()).collect();
         self.avatars.retain(|k, _| valid_ids.contains(k.as_str()));
 
+        // Preserve the currently-selected channel across the remap. If
+        // the current id is still present → keep it. Otherwise pick a
+        // fresh random so the user doesn't get silently bumped to
+        // channel 0.
+        let current_id = self
+            .channels
+            .get(self.selected)
+            .map(|c| c.id.clone());
         self.channels = new_channels;
-        if self.selected >= self.channels.len() {
-            self.selected = 0;
+        if let Some(id) = current_id {
+            if let Some(ix) = self.channels.iter().position(|c| c.id == id) {
+                self.selected = ix;
+                return;
+            }
         }
+        self.selected = if self.channels.is_empty() {
+            0
+        } else {
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.subsec_nanos() as usize)
+                .unwrap_or(0)
+                % self.channels.len()
+        };
     }
 
     pub fn set_avatar(&mut self, channel_id: String, image: Arc<Image>) {

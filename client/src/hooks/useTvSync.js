@@ -68,6 +68,7 @@ export function useTvSync(channelId) {
 
   // Switch channel on server + fetch state
   useEffect(() => {
+    if (!channelId) return; // Wait for App.jsx to pick a random default.
     setIsLoading(true);
     setTvState(null);
 

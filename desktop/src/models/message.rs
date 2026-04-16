@@ -10,5 +10,7 @@ pub struct ChatMessage {
     pub username: String,
     pub color: String,
     pub registered: bool,
-    pub timestamp: u64,
+    /// Server-formatted HH:MM in the server's timezone (so every client
+    /// sees the same time, independent of its machine TZ).
+    pub time: String,
 }

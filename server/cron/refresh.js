@@ -16,6 +16,7 @@ function startCronJobs() {
   // and guarantees a fresh process every morning (clears leaks, reloads
   // config.js edits). The process manager (PM2 / nodemon) respawns us.
   cron.schedule(config.DAILY_REFRESH_CRON, async () => {
+    // NB: runs in config.SERVER_TZ (see options below).
     const day = new Date().getDay(); // 0 = Sun … 6 = Sat
     const bucket = config.CHANNELS.filter((_, i) => i % 7 === day);
     console.log(
@@ -44,9 +45,11 @@ function startCronJobs() {
     // Exit 1 so *both* PM2 (autorestart) and nodemon (treats non-zero as
     // crash → respawn) bring us back up. Small delay lets sockets/logs flush.
     setTimeout(() => process.exit(1), 2000);
-  });
+  }, { timezone: config.SERVER_TZ });
 
-  console.log(`[CRON] Daily refresh scheduled: ${config.DAILY_REFRESH_CRON}`);
+  console.log(
+    `[CRON] Daily refresh scheduled: ${config.DAILY_REFRESH_CRON} (${config.SERVER_TZ})`
+  );
 
   // RSS poll every 30 minutes for all channels
   setInterval(async () => {

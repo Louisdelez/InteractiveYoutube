@@ -28,6 +28,17 @@ function clampCodepoints(input, max) {
   return cps.length > max ? cps.slice(0, max).join('') : input;
 }
 
+// HH:MM formatter — uses the server's TZ (process TZ, driven by the
+// TZ env var if set). Single instance to avoid per-message allocation.
+const timeFormatter = new Intl.DateTimeFormat('fr-FR', {
+  hour: '2-digit',
+  minute: '2-digit',
+  timeZone: config.SERVER_TZ || undefined,
+});
+function formatServerTime(date) {
+  return timeFormatter.format(date);
+}
+
 // Redis keys per channel
 const chatHistoryKey = (channelId) => `chat:history:${channelId}`;
 const RATE_KEY_PREFIX = 'chat:rate:';
@@ -183,13 +194,20 @@ function registerChatHandlers(io, socket, user) {
 
     const channelId = socket.currentChannel || defaultChannel;
 
+    // Format the display time on the server so every client (no matter
+    // their machine TZ) sees the same HH:MM. Server TZ is set via the
+    // TZ env var (defaults to the host TZ).
+    const now = new Date();
+    const time = formatServerTime(now);
+
     const message = {
       id: nanoid(),
       text: trimmed,
       username,
       color,
       registered,
-      timestamp: Date.now(),
+      timestamp: now.getTime(),
+      time,
       channelId,
     };
 

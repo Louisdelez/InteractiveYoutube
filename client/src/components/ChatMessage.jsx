@@ -1,13 +1,18 @@
 import { memo } from 'react';
 import './ChatMessage.css';
 
-const timeFormatter = new Intl.DateTimeFormat('fr-FR', {
+// The server sends `time` pre-formatted in its own timezone so every
+// viewer sees the same HH:MM regardless of their machine TZ. Fall back
+// to a client-side format only if a legacy message has no `time` field.
+const localFmt = new Intl.DateTimeFormat('fr-FR', {
   hour: '2-digit',
   minute: '2-digit',
 });
 
 const ChatMessage = memo(function ChatMessage({ message }) {
-  const time = timeFormatter.format(new Date(message.timestamp));
+  const time =
+    message.time ||
+    (message.timestamp ? localFmt.format(new Date(message.timestamp)) : '');
 
   return (
     <div className="chat-message">

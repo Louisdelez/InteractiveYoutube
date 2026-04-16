@@ -7,15 +7,29 @@ import VolumeControl from './VolumeControl';
 import CaptionsControl from './CaptionsControl';
 import PlayerFallback from './PlayerFallback';
 import TauriPlayer from './TauriPlayer';
+import ChannelBadge from './ChannelBadge';
 import './Player.css';
 
-export default function Player({ channelId }) {
+export default function Player({ channelId, channelMeta, isFavorite, onToggleFavorite }) {
   const { tvState, isLoading, onPlayerReady, onVideoEnd, onVideoError, clockOffset } = useTvSync(channelId);
-  const [isMuted, setIsMuted] = useState(false);
-  const [volume, setVolume] = useState(100);
+  // Persisted across F5 via localStorage. Default: not muted, volume 100.
+  const [isMuted, setIsMuted] = useState(
+    () => localStorage.getItem('iy-muted') === '1'
+  );
+  const [volume, setVolume] = useState(() => {
+    const raw = parseInt(localStorage.getItem('iy-volume'), 10);
+    return Number.isFinite(raw) && raw >= 0 && raw <= 100 ? raw : 100;
+  });
   const [isPlaying, setIsPlaying] = useState(true);
   const playerRef = useRef(null);
   const fallbackTimerRef = useRef(null);
+
+  useEffect(() => {
+    try { localStorage.setItem('iy-muted', isMuted ? '1' : '0'); } catch {}
+  }, [isMuted]);
+  useEffect(() => {
+    try { localStorage.setItem('iy-volume', String(volume)); } catch {}
+  }, [volume]);
 
   // For non-embeddable videos on web: auto-advance when duration elapses
   useEffect(() => {
@@ -40,8 +54,12 @@ export default function Player({ channelId }) {
 
   const handleReady = (event) => {
     playerRef.current = event.target;
-    event.target.unMute();
     event.target.setVolume(volume);
+    if (isMuted) {
+      event.target.mute();
+    } else {
+      event.target.unMute();
+    }
     onPlayerReady(event);
   };
 
@@ -175,6 +193,11 @@ export default function Player({ channelId }) {
           onError={onVideoError}
           className="youtube-player"
           iframeClassName="youtube-iframe"
+        />
+        <ChannelBadge
+          channel={channelMeta}
+          isFavorite={isFavorite}
+          onToggleFavorite={onToggleFavorite}
         />
         <div className="player-blocker" />
         {!isPlaying && (

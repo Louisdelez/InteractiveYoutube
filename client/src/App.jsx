@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import socket from './services/socket';
+import { api } from './services/api';
 import { useSocket } from './hooks/useSocket';
 import { useAuth } from './hooks/useAuth';
 import { usePing } from './hooks/usePing';
@@ -43,12 +44,29 @@ export default function App() {
   const ping = usePing();
   const [chatOpen, setChatOpen] = useState(true);
   const [showAuth, setShowAuth] = useState(false);
-  const [currentChannel, setCurrentChannel] = useState('amixem');
+  const [currentChannel, setCurrentChannel] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [route, setRoute] = useState(
     typeof window !== 'undefined' ? window.location.hash : ''
   );
   const [totalViewers, setTotalViewers] = useState(0);
+  const [channels, setChannels] = useState([]);
+  // Last-visited channels, most recent first. Capped at 5. Persisted
+  // across sessions via localStorage.
+  const [history, setHistory] = useState(() => {
+    try {
+      const raw = localStorage.getItem('iy-history');
+      return raw ? JSON.parse(raw) : [];
+    } catch { return []; }
+  });
+  // Favourited channel ids. Persisted same way; toggled via right-click
+  // in the sidebar (see ChannelSidebar).
+  const [favorites, setFavorites] = useState(() => {
+    try {
+      const raw = localStorage.getItem('iy-favorites');
+      return raw ? JSON.parse(raw) : [];
+    } catch { return []; }
+  });
 
   useEffect(() => {
     const onHash = () => setRoute(window.location.hash);
@@ -61,6 +79,50 @@ export default function App() {
     socket.on('viewers:total', onTotal);
     return () => socket.off('viewers:total', onTotal);
   }, []);
+
+  // Fetch the authoritative channel list from the server once, then
+  // pick a random starting channel so every session lands somewhere
+  // different. Propagated to the sidebar + badge.
+  useEffect(() => {
+    let alive = true;
+    api.get('/api/tv/channels')
+      .then((list) => {
+        if (!alive || !Array.isArray(list) || list.length === 0) return;
+        const sorted = [...list].sort((a, b) => a.name.localeCompare(b.name, 'fr'));
+        setChannels(sorted);
+        if (!currentChannel) {
+          const rnd = list[Math.floor(Math.random() * list.length)];
+          setCurrentChannel(rnd.id);
+        }
+      })
+      .catch(() => {
+        if (alive && !currentChannel) setCurrentChannel('amixem');
+      });
+    return () => { alive = false; };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Every time the current channel changes, push it to the history
+  // (front = most recent). Capped at 5, deduped. Persisted.
+  useEffect(() => {
+    if (!currentChannel) return;
+    setHistory((prev) => {
+      const next = [currentChannel, ...prev.filter((id) => id !== currentChannel)].slice(0, 5);
+      try { localStorage.setItem('iy-history', JSON.stringify(next)); } catch {}
+      return next;
+    });
+  }, [currentChannel]);
+
+  const toggleFavorite = (channelId) => {
+    setFavorites((prev) => {
+      const next = prev.includes(channelId)
+        ? prev.filter((id) => id !== channelId)
+        : [...prev, channelId];
+      try { localStorage.setItem('iy-favorites', JSON.stringify(next)); } catch {}
+      return next;
+    });
+  };
+
+  const currentMeta = channels.find((c) => c.id === currentChannel) || null;
 
   if (route === '#download') {
     return (
@@ -154,12 +216,21 @@ export default function App() {
       </div>
       <div className="main-content">
         <ChannelSidebar
+          channels={channels}
           currentChannel={currentChannel}
           onChannelChange={setCurrentChannel}
           searchQuery={searchQuery}
+          history={history}
+          favorites={favorites}
+          onToggleFavorite={toggleFavorite}
         />
         <div className="player-panel">
-          <Player channelId={currentChannel} />
+          <Player
+            channelId={currentChannel}
+            channelMeta={currentMeta}
+            isFavorite={currentChannel ? favorites.includes(currentChannel) : false}
+            onToggleFavorite={toggleFavorite}
+          />
         </div>
         <div className={`chat-panel${chatOpen ? '' : ' chat-hidden'}`}>
           <Chat channelId={currentChannel} />

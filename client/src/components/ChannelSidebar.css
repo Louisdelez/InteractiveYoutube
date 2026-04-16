@@ -89,3 +89,35 @@
   border-radius: 50%;
   object-fit: cover;
 }
+
+.channel-section-header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 0 4px;
+  color: #555;
+  font-size: 0.6rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.channel-section-sep {
+  width: 24px;
+  height: 1px;
+  background: #2d2d30;
+  margin: 4px 0;
+  flex-shrink: 0;
+}
+
+.channel-fav-badge {
+  position: absolute;
+  top: -1px;
+  right: -1px;
+  color: #f5c518;
+  background: #0e0e10;
+  border-radius: 50%;
+  padding: 1px;
+  pointer-events: none;
+  filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.6));
+}

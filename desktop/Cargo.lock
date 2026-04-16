@@ -3343,7 +3343,6 @@ dependencies = [
  "gpui-component",
  "gpui_platform",
  "image",
- "libc",
  "libmpv2",
  "png 0.17.16",
  "raw-window-handle",
