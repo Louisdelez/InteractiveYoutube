@@ -49,6 +49,10 @@ pub struct AppView {
     settings_modal: Option<Entity<SettingsModal>>,
     /// Full-screen planning (TV guide) view. None = closed.
     planning: Option<Entity<PlanningView>>,
+    /// Close-event subscription for the current planning entity. Replaced
+    /// (dropping the old) every time planning reopens — without this, each
+    /// open/close cycle leaked a Subscription into `_subscriptions`.
+    planning_sub: Option<Subscription>,
     /// Persistent user preferences (memory cache size, favourites).
     settings: Settings,
     search_state: Entity<InputState>,
@@ -435,11 +439,32 @@ impl AppView {
                                         }
                                     }
                                     ServerEvent::Connected => {
+                                        // Snapshot the remembered channel
+                                        // BEFORE flipping `connected = true`
+                                        // (done inside the update closure).
+                                        // The server picks a RANDOM default
+                                        // channel on every socket connect,
+                                        // so after a brief disconnect (WiFi
+                                        // hiccup, server restart) it would
+                                        // yank the user off whatever they
+                                        // were watching — often landing on
+                                        // the first chaîne (Amixem) or any
+                                        // other by lottery. We immediately
+                                        // re-assert our current channel
+                                        // here; the next tv:state arrives
+                                        // for our chaîne, overriding the
+                                        // server's random pick.
+                                        let mut remembered_channel: Option<String> = None;
                                         if let Some(e) = entity_for_status.upgrade() {
                                             e.update(cx, |this, cx| {
                                                 this.connected = true;
+                                                remembered_channel = this.current_channel_id.clone();
                                                 cx.notify();
                                             });
+                                        }
+                                        if let Some(ch) = remembered_channel {
+                                            let _ = cmd_tx_for_pseudo
+                                                .send(ClientCommand::SwitchChannel(ch));
                                         }
                                         // Push the per-session anonymous
                                         // pseudo + colour to the server.
@@ -645,6 +670,7 @@ impl AppView {
                 total_viewers: 0,
                 settings_modal: None,
                 planning: None,
+                planning_sub: None,
                 settings: initial_settings,
                 tooltip,
                 cmd_tx,
@@ -848,16 +874,17 @@ impl AppView {
             .unwrap_or_else(|| channels.first().map(|c| c.id.clone()).unwrap_or_default());
         let planning = cx.new(|cx| PlanningView::new(channels, initial, window, cx));
         let player_clone = self.player.clone();
-        let _sub = cx.subscribe(
+        let sub = cx.subscribe(
             &planning,
             move |this: &mut AppView, _planning, _ev: &PlanningClose, cx| {
                 #[cfg(target_os = "linux")]
                 player_clone.update(cx, |p, _| p.show_video());
                 this.planning = None;
+                this.planning_sub = None;
                 cx.notify();
             },
         );
-        self._subscriptions.push(_sub);
+        self.planning_sub = Some(sub);
         // Hide mpv X11 child so the planning grid isn't covered by it.
         #[cfg(target_os = "linux")]
         self.player.update(cx, |p, _| p.hide_video());

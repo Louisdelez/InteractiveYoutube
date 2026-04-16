@@ -129,8 +129,8 @@ impl ChatView {
 
 impl ChatView {
     fn append_to_input(&self, emoji: &str, window: &mut Window, cx: &mut Context<Self>) {
-        let current = self.input_state.read(cx).value().to_string();
-        let next = format!("{}{}", current, emoji);
+        let mut next = self.input_state.read(cx).value().to_string();
+        next.push_str(emoji);
         self.input_state.update(cx, |s, cx| {
             s.set_value(next, window, cx);
         });
@@ -221,10 +221,15 @@ impl Render for ChatView {
                         .gap(px(2.0))
                         .px_2()
                         .py_1()
-                        .children(
-                            self.messages.iter().rev().take(RENDER_WINDOW).collect::<Vec<_>>().into_iter().rev().map(|msg| {
+                        .children({
+                            // Render only the tail of the buffer (oldest
+                            // first so the scroll anchor at the bottom
+                            // stays on the newest message). `skip()` on
+                            // a VecDeque iterator walks indices in
+                            // contiguous memory — no intermediate Vec.
+                            let start = self.messages.len().saturating_sub(RENDER_WINDOW);
+                            self.messages.iter().skip(start).map(|msg| {
                                 let color = parse_hex_color(&msg.color).unwrap_or(0xaaaaaa);
-                                let time = msg.time.clone();
                                 div()
                                     .px_2()
                                     .py(px(2.0))
@@ -236,7 +241,7 @@ impl Render for ChatView {
                                             .child(
                                                 div()
                                                     .text_color(rgb(0x666666))
-                                                    .child(time)
+                                                    .child(msg.time.clone())
                                             )
                                             .child(
                                                 div()
@@ -250,8 +255,8 @@ impl Render for ChatView {
                                                     .child(msg.text.clone())
                                             )
                                     )
-                            }).collect::<Vec<_>>()
-                        )
+                            })
+                        })
                 }
             )
             .child({

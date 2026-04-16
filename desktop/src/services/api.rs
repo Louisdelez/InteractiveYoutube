@@ -213,13 +213,46 @@ pub fn fetch_channels() -> Result<Vec<ServerChannel>, String> {
     resp.json::<Vec<ServerChannel>>().map_err(|e| e.to_string())
 }
 
-/// Download raw bytes of a URL (used for avatar images).
+/// Download raw bytes of a URL (used for avatar images). On-disk cache
+/// keyed by a content-free hash of the URL. Cache lives in
+/// `$XDG_CACHE_HOME/koala-tv/avatars/` (fallback `~/.cache/…`) so avatars
+/// don't need to be re-downloaded at every startup. Cache miss = HTTP
+/// fetch; on success we best-effort write the bytes back to disk.
 pub fn fetch_bytes(url: &str) -> Result<Vec<u8>, String> {
+    let cache_path = avatar_cache_path(url);
+    if let Some(ref path) = cache_path {
+        if let Ok(bytes) = std::fs::read(path) {
+            if !bytes.is_empty() {
+                return Ok(bytes);
+            }
+        }
+    }
     let resp = client()?.get(url).send().map_err(|e| e.to_string())?;
     if !resp.status().is_success() {
         return Err(format!("HTTP {}: {}", resp.status(), url));
     }
-    resp.bytes()
+    let bytes: Vec<u8> = resp
+        .bytes()
         .map(|b| b.to_vec())
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+    if let Some(path) = cache_path {
+        if let Some(parent) = path.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        let _ = std::fs::write(&path, &bytes);
+    }
+    Ok(bytes)
+}
+
+fn avatar_cache_path(url: &str) -> Option<std::path::PathBuf> {
+    let base = std::env::var_os("XDG_CACHE_HOME")
+        .map(std::path::PathBuf::from)
+        .or_else(|| std::env::var_os("HOME").map(|h| std::path::PathBuf::from(h).join(".cache")))?;
+    // FNV-1a 64-bit — tiny, dependency-free, collision-irrelevant here.
+    let mut h: u64 = 0xcbf29ce484222325;
+    for b in url.as_bytes() {
+        h ^= *b as u64;
+        h = h.wrapping_mul(0x100000001b3);
+    }
+    Some(base.join("koala-tv/avatars").join(format!("{:016x}", h)))
 }

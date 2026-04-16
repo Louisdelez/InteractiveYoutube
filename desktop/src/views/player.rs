@@ -17,6 +17,47 @@ use crate::views::memory_cache::{MemorizedChannel, MemoryCache};
 #[cfg(target_os = "linux")]
 use crate::views::popup_menu::{MenuEvent, MenuKind, PopupMenu};
 
+// ─── X11 error handling ──────────────────────────────────────────────
+// Without a custom handler, Xlib's default prints the error and calls
+// `exit(1)` — which is exactly the SIGSEGV-looking crash we saw on
+// shutdown (BadWindow on X_DestroyWindow at serial ~112). At teardown
+// time the parent GPUI window may already be gone, so the X server has
+// auto-destroyed our child/sibling windows before our Drop impls run
+// their own XDestroyWindow. That's a benign race, not a real bug —
+// swallow it instead of aborting the process.
+#[cfg(target_os = "linux")]
+static X11_ERROR_HANDLER_INSTALLED: std::sync::Once = std::sync::Once::new();
+#[cfg(target_os = "linux")]
+pub(crate) static X11_SHUTTING_DOWN: std::sync::atomic::AtomicBool =
+    std::sync::atomic::AtomicBool::new(false);
+
+#[cfg(target_os = "linux")]
+unsafe extern "C" fn x11_error_handler(
+    _display: *mut x11_dl::xlib::Display,
+    event: *mut x11_dl::xlib::XErrorEvent,
+) -> std::os::raw::c_int {
+    // During shutdown, swallow everything silently.
+    if X11_SHUTTING_DOWN.load(std::sync::atomic::Ordering::Acquire) {
+        return 0;
+    }
+    let ev = &*event;
+    // Runtime errors: log once and continue (never exit). BadWindow on
+    // a stale resource is recoverable — the default handler aborting
+    // the whole process is worse than a warning.
+    eprintln!(
+        "X11 error: code={} request={} resource=0x{:x}",
+        ev.error_code, ev.request_code, ev.resourceid
+    );
+    0
+}
+
+#[cfg(target_os = "linux")]
+fn install_x11_error_handler(xlib: &x11_dl::xlib::Xlib) {
+    X11_ERROR_HANDLER_INSTALLED.call_once(|| unsafe {
+        (xlib.XSetErrorHandler)(Some(x11_error_handler));
+    });
+}
+
 // Layout constants (must match app.rs)
 const SIDEBAR_W: f32 = 56.0;
 const CHAT_W: f32 = 340.0;
@@ -335,8 +376,25 @@ impl EventEmitter<FavoriteToggleFromBadge> for PlayerView {}
 #[cfg(target_os = "linux")]
 impl Drop for PlayerView {
     fn drop(&mut self) {
+        // Mark teardown so the global X11 error handler swallows benign
+        // BadWindow races (parent GPUI window may already be gone, so
+        // the X server has auto-destroyed our descendants).
+        X11_SHUTTING_DOWN.store(true, std::sync::atomic::Ordering::Release);
+
+        // Rust drops struct fields AFTER this user Drop body. Our
+        // fields (backup, loading_overlay, channel_badge, popup, and
+        // every cached backup in memory_cache) each XDestroyWindow on
+        // the shared `display` we're about to close. Drop them here
+        // FIRST so their Drop impls run against a live display.
+        self.backup.take();
+        self.loading_overlay.take();
+        self.channel_badge.take();
+        self.popup.take();
+        self.memory_cache.clear();
+
         unsafe {
             (self.xlib.XDestroyWindow)(self.display, self.child_window);
+            (self.xlib.XFlush)(self.display);
             (self.xlib.XCloseDisplay)(self.display);
         }
     }
@@ -358,6 +416,7 @@ impl PlayerView {
             };
 
             let xlib = Arc::new(x11_dl::xlib::Xlib::open().expect("Failed to open Xlib"));
+            install_x11_error_handler(&xlib);
             let display = unsafe { (xlib.XOpenDisplay)(std::ptr::null()) };
             if display.is_null() {
                 panic!("Could not open X display");
@@ -555,9 +614,23 @@ impl PlayerView {
                 let pop_rx = popup_rx.map(|r| std::sync::Arc::new(std::sync::Mutex::new(r)));
                 let this_entity = cx.entity().downgrade();
                 cx.spawn(async move |_, cx| {
+                    // Adaptive poll cadence. During "critical" phases
+                    // (channel switching, cache stall detection, pending
+                    // main-load, swap-up race) we need fine-grained 16 ms
+                    // sampling — those windows are sub-second and a slow
+                    // poll would miss the ready-signal edge. Idle, we
+                    // drop to 60 ms (≈16 Hz) which is enough to drain
+                    // mpv events + refresh overlays, and avoids burning
+                    // ~5 ms CPU per tick on the UI thread (≈ 30% of a
+                    // frame budget at 60 FPS).
+                    let critical_interval = std::time::Duration::from_millis(16);
+                    let idle_interval = std::time::Duration::from_millis(60);
+                    let critical_flag: std::sync::Arc<std::sync::atomic::AtomicBool> =
+                        std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
                     loop {
                         let entity = this_entity.clone();
                         let pop_rx = pop_rx.clone();
+                        let crit = critical_flag.clone();
                         cx.update(move |cx| {
                             if let Some(e) = entity.upgrade() {
                                 e.update(cx, |p: &mut PlayerView, cx| {
@@ -929,12 +1002,25 @@ impl PlayerView {
                                     if had_menu_event {
                                         cx.notify();
                                     }
+                                    // Record whether we're in a critical
+                                    // phase, so the outer loop can pick
+                                    // the tight 16 ms interval.
+                                    let is_critical = p.loading_for_video.is_some()
+                                        || p.cache_stall_since.is_some()
+                                        || p.switch_arm_at.is_some()
+                                        || p.pending_main_load.is_some()
+                                        || p.pending_backup_reveal
+                                        || !p.main_first_frame_ready;
+                                    crit.store(is_critical, std::sync::atomic::Ordering::Relaxed);
                                 });
                             }
                         });
-                        cx.background_executor()
-                            .timer(std::time::Duration::from_millis(16))
-                            .await;
+                        let interval = if critical_flag.load(std::sync::atomic::Ordering::Relaxed) {
+                            critical_interval
+                        } else {
+                            idle_interval
+                        };
+                        cx.background_executor().timer(interval).await;
                     }
                 })
                 .detach();

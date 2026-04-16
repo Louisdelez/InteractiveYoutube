@@ -19,6 +19,12 @@ use std::sync::{Arc, Mutex};
 use x11_dl::xlib::{self, Display};
 
 pub struct BackupPlayer {
+    // Field order matters: `mpv` MUST drop before `_window_guard` so
+    // mpv's internal X cleanup (video output, input context…) runs
+    // while the wid is still a valid X resource. If we destroyed the
+    // window first mpv would hit BadWindow on its own wid during its
+    // terminate path — that's the crash we get on channel switch when
+    // an LRU-evicted BackupPlayer is dropped.
     pub mpv: Arc<Mutex<Mpv>>,
     xlib: Arc<xlib::Xlib>,
     display: *mut Display,
@@ -31,6 +37,25 @@ pub struct BackupPlayer {
     /// signal — `time-pos` jumps to `start` instantly on loadfile so it
     /// can't be used. Reset to `false` on every `load()`.
     first_frame_ready: bool,
+    /// Must be the LAST field — drops after `mpv` so XDestroyWindow
+    /// runs once mpv has released the wid.
+    _window_guard: WindowGuard,
+}
+
+struct WindowGuard {
+    xlib: Arc<xlib::Xlib>,
+    display: *mut Display,
+    window: c_ulong,
+}
+unsafe impl Send for WindowGuard {}
+unsafe impl Sync for WindowGuard {}
+impl Drop for WindowGuard {
+    fn drop(&mut self) {
+        unsafe {
+            (self.xlib.XDestroyWindow)(self.display, self.window);
+            (self.xlib.XFlush)(self.display);
+        }
+    }
 }
 
 unsafe impl Send for BackupPlayer {}
@@ -95,12 +120,13 @@ impl BackupPlayer {
 
             Some(BackupPlayer {
                 mpv: Arc::new(Mutex::new(mpv)),
-                xlib,
+                xlib: xlib.clone(),
                 display,
                 window,
                 visible: false,
                 current_url: None,
                 first_frame_ready: false,
+                _window_guard: WindowGuard { xlib, display, window },
             })
         }
     }
@@ -328,11 +354,3 @@ impl BackupPlayer {
     }
 }
 
-impl Drop for BackupPlayer {
-    fn drop(&mut self) {
-        unsafe {
-            (self.xlib.XDestroyWindow)(self.display, self.window);
-            (self.xlib.XFlush)(self.display);
-        }
-    }
-}

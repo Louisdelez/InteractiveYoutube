@@ -239,8 +239,16 @@ fn now_ms() -> i64 {
         .unwrap_or(0)
 }
 
-fn week_days(week_start_ms: i64) -> Vec<i64> {
-    (0..7).map(|i| add_days_ms(week_start_ms, i)).collect()
+fn week_days(week_start_ms: i64) -> [i64; 7] {
+    [
+        add_days_ms(week_start_ms, 0),
+        add_days_ms(week_start_ms, 1),
+        add_days_ms(week_start_ms, 2),
+        add_days_ms(week_start_ms, 3),
+        add_days_ms(week_start_ms, 4),
+        add_days_ms(week_start_ms, 5),
+        add_days_ms(week_start_ms, 6),
+    ]
 }
 
 impl Render for PlanningView {
@@ -528,7 +536,7 @@ impl PlanningView {
     fn render_grid(
         &self,
         pl: PlaylistInfo,
-        days: Vec<i64>,
+        days: [i64; 7],
         cx: &mut Context<Self>,
     ) -> impl IntoElement {
         let now_ms = self.now_ms;
