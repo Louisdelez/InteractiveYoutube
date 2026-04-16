@@ -8,13 +8,16 @@ function registerTvHandlers(io, socket) {
   // NOTE: room join/leave + viewer count are handled in `socket/index.js`
   // (single source of truth, debounced). This module only handles
   // tv:state pushes + ping/pong + error reports.
+  //
+  // The initial `tv:state` is emitted from `socket/index.js` AFTER
+  // `joinChannel()` so it carries the state of the channel the socket
+  // was actually joined to — previously we hard-coded CHANNELS[0]
+  // (Amixem) here, which clashed with the random `defaultChannel`
+  // the connection handler uses for the room membership. The client
+  // would land on Amixem, then 15 s later the first `tv:sync` for the
+  // (random) room channel pulled it onto yet another chaîne — that's
+  // the "random self-switch" users were seeing.
   const defaultChannel = config.CHANNELS[0].id;
-
-  // Send initial state for default channel.
-  const state = getTvState(defaultChannel);
-  if (state) {
-    socket.emit('tv:state', state);
-  }
 
   // RTT ping/pong
   socket.on('tv:ping', (clientTime) => {

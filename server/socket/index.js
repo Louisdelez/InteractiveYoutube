@@ -4,6 +4,7 @@ const jwt = require('jsonwebtoken');
 const config = require('../config');
 const { redisPub, redisSub, redis } = require('../services/redis');
 const { registerTvHandlers, startSyncBroadcast, stopSyncBroadcast } = require('./tv');
+const { getTvState } = require('../services/tv');
 const { registerChatHandlers, stopBatching } = require('./chat');
 const { findUserById } = require('../db');
 const log = require('../services/logger');
@@ -167,6 +168,14 @@ function setupSocketIO(httpServer) {
     registerChatHandlers(io, socket, socket.user);
 
     await joinChannel(socket, defaultChannel);
+    // Emit the initial tv:state for the channel we actually joined —
+    // NOT a hardcoded default. Used to live in tv.js but Amixem was
+    // hard-coded there regardless of which room we put the socket in,
+    // which desynced the client (see comment in tv.js).
+    const initialState = getTvState(defaultChannel);
+    if (initialState) {
+      socket.emit('tv:state', initialState);
+    }
     socket.emit('viewers:count', {
       count: await redis.scard(viewerSetKey(defaultChannel)),
     });
