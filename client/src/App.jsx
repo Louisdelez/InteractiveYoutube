@@ -4,9 +4,10 @@ import { api } from './services/api';
 import { useSocket } from './hooks/useSocket';
 import { useAuth } from './hooks/useAuth';
 import { usePing } from './hooks/usePing';
-import { MessageSquare, MessageSquareOff, LogIn, LogOut, User, Search, Download, Info, Eye } from 'lucide-react';
+import { MessageSquare, MessageSquareOff, LogIn, LogOut, User, Search, Download, Info, Eye, Calendar } from 'lucide-react';
 import DownloadPage from './components/DownloadPage';
 import AboutPage from './components/AboutPage';
+import PlanningPage from './components/PlanningPage';
 import SignalBars from './components/SignalBars';
 
 const REPO_URL = 'https://github.com/Louisdelez/KoalaTV';
@@ -143,6 +144,16 @@ export default function App() {
     );
   }
 
+  if (route.startsWith('#planning')) {
+    return (
+      <PlanningPage
+        onBack={() => { window.location.hash = ''; }}
+        channelId={currentChannel}
+        channels={channels}
+      />
+    );
+  }
+
   return (
     <div className="app">
       <div className="top-bar">
@@ -193,6 +204,10 @@ export default function App() {
           />
         </div>
         <div className="top-bar-right">
+          <a href="#planning" className="top-bar-planning" title="Programme de la semaine">
+            <Calendar size={14} />
+            <span>Programme</span>
+          </a>
           <button className="chat-toggle" onClick={() => setChatOpen(!chatOpen)}>
             {chatOpen ? <MessageSquareOff size={15} /> : <MessageSquare size={15} />}
             <span>{chatOpen ? 'Masquer le chat' : 'Afficher le chat'}</span>

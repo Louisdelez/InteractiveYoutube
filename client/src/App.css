@@ -118,6 +118,26 @@ body {
   border-color: rgba(255, 255, 255, 0.25);
 }
 
+.top-bar-planning {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #c8c8cc;
+  background: transparent;
+  padding: 5px 11px;
+  border-radius: 6px;
+  text-decoration: none;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.top-bar-planning:hover {
+  color: #efeff1;
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(155, 89, 182, 0.45);
+}
+
 .top-bar-search {
   display: flex;
   align-items: center;

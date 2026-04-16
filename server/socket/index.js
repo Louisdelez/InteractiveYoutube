@@ -24,8 +24,12 @@ const ALL_CHANNEL_IDS = config.CHANNELS.map((c) => c.id);
 // this, the limit was process-local and trivially bypassed behind a
 // load balancer.
 const ipKey = (ip) => `iy:ip:${ip}`;
-const MAX_CONNECTIONS_PER_IP = 10;
-const IP_TTL_SECS = 3600;
+// Dev-friendly budget: 30 connexions par IP par 10 min. Les reloads
+// rapides (F5, kill -9 du desktop) ne décrémentent pas toujours le
+// compteur ; un TTL court garantit qu'on ne bloque pas sa propre
+// session pendant 1 h après 10 restarts consécutifs.
+const MAX_CONNECTIONS_PER_IP = 30;
+const IP_TTL_SECS = 600;
 
 // Per-socket throttle for tv:switchChannel — prevents Redis thrash
 // when a user spams channel buttons.

@@ -5,6 +5,7 @@ pub mod auth;
 pub mod settings_modal;
 pub mod tooltip;
 pub mod icons;
+pub mod planning;
 #[cfg(target_os = "linux")]
 pub mod popup_menu;
 #[cfg(target_os = "linux")]

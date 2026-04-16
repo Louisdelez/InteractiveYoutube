@@ -176,6 +176,34 @@ pub struct ServerChannel {
     pub avatar: String,
 }
 
+#[derive(Debug, Clone, Deserialize)]
+pub struct PlaylistVideo {
+    #[serde(rename = "videoId")]
+    pub video_id: String,
+    pub title: String,
+    pub duration: f64,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct PlaylistInfo {
+    #[serde(rename = "channelId")]
+    pub channel_id: String,
+    #[serde(rename = "tvStartedAt")]
+    pub tv_started_at: f64,
+    #[serde(rename = "totalDuration")]
+    pub total_duration: f64,
+    pub videos: Vec<PlaylistVideo>,
+}
+
+pub fn fetch_playlist(channel_id: &str) -> Result<PlaylistInfo, String> {
+    let url = format!("{}/api/tv/playlist?channel={}", SERVER_URL, channel_id);
+    let resp = client()?.get(&url).send().map_err(|e| e.to_string())?;
+    if !resp.status().is_success() {
+        return Err(format!("HTTP {}", resp.status()));
+    }
+    resp.json::<PlaylistInfo>().map_err(|e| e.to_string())
+}
+
 pub fn fetch_channels() -> Result<Vec<ServerChannel>, String> {
     let url = format!("{}/api/tv/channels", SERVER_URL);
     let resp = client()?.get(&url).send().map_err(|e| e.to_string())?;

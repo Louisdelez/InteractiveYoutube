@@ -12,6 +12,7 @@ use crate::views::settings_modal::{SettingsEvent, SettingsModal};
 use crate::views::chat::{ChatSend, ChatView};
 use crate::views::icons::{IconCache, IconName};
 use crate::views::player::{AutoAdvanced, FavoriteToggleFromBadge, MemoryChanged, PlayerView};
+use crate::views::planning::{PlanningClose, PlanningView};
 use crate::views::sidebar::{ChannelFavoriteToggle, ChannelHovered, ChannelSelected, SidebarView};
 use crate::views::tooltip::TooltipOverlay;
 use std::cell::RefCell;
@@ -46,6 +47,8 @@ pub struct AppView {
     total_viewers: usize,
     /// Settings modal (gear icon in topbar). None = closed.
     settings_modal: Option<Entity<SettingsModal>>,
+    /// Full-screen planning (TV guide) view. None = closed.
+    planning: Option<Entity<PlanningView>>,
     /// Persistent user preferences (memory cache size, favourites).
     settings: Settings,
     search_state: Entity<InputState>,
@@ -641,6 +644,7 @@ impl AppView {
                 chat_open: true,
                 total_viewers: 0,
                 settings_modal: None,
+                planning: None,
                 settings: initial_settings,
                 tooltip,
                 cmd_tx,
@@ -817,6 +821,47 @@ impl AppView {
         #[cfg(target_os = "linux")]
         self.player.update(cx, |p, _| p.hide_video());
         self.settings_modal = Some(modal);
+        cx.notify();
+    }
+
+    fn open_planning(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.planning.is_some() {
+            return;
+        }
+        // Build from the current sidebar-known channel list so the picker
+        // has every channel, not just whatever hardcoded fallback knew.
+        let channels = self
+            .sidebar
+            .read(cx)
+            .channels
+            .iter()
+            .map(|c| api::ServerChannel {
+                id: c.id.clone(),
+                name: c.name.clone(),
+                handle: c.handle.clone(),
+                avatar: c.avatar_url.clone(),
+            })
+            .collect::<Vec<_>>();
+        let initial = self
+            .current_channel_id
+            .clone()
+            .unwrap_or_else(|| channels.first().map(|c| c.id.clone()).unwrap_or_default());
+        let planning = cx.new(|cx| PlanningView::new(channels, initial, window, cx));
+        let player_clone = self.player.clone();
+        let _sub = cx.subscribe(
+            &planning,
+            move |this: &mut AppView, _planning, _ev: &PlanningClose, cx| {
+                #[cfg(target_os = "linux")]
+                player_clone.update(cx, |p, _| p.show_video());
+                this.planning = None;
+                cx.notify();
+            },
+        );
+        self._subscriptions.push(_sub);
+        // Hide mpv X11 child so the planning grid isn't covered by it.
+        #[cfg(target_os = "linux")]
+        self.player.update(cx, |p, _| p.hide_video());
+        self.planning = Some(planning);
         cx.notify();
     }
 
@@ -1092,6 +1137,34 @@ impl Render for AppView {
                             .justify_end()
                             .items_center()
                             .gap_3()
+                            // Planning / calendrier — opens the web
+                            // planning page in the user's default browser
+                            // with the current desktop channel pre-selected
+                            // via the hash param. The web page centres the
+                            // red "now" line in the viewport on open.
+                            .child({
+                                let icon = self
+                                    .icons
+                                    .borrow_mut()
+                                    .get(IconName::Calendar, 14, 0xaaaaaa);
+                                let mut btn = div()
+                                    .id("planning-btn")
+                                    .w(px(22.0))
+                                    .h(px(22.0))
+                                    .flex()
+                                    .items_center()
+                                    .justify_center()
+                                    .rounded(px(4.0))
+                                    .cursor_pointer()
+                                    .hover(|this| this.bg(rgb(0x26262b)))
+                                    .on_click(cx.listener(|this: &mut AppView, _ev: &ClickEvent, window, cx| {
+                                        this.open_planning(window, cx);
+                                    }));
+                                if let Some(icon) = icon {
+                                    btn = btn.child(img(icon).w(px(14.0)).h(px(14.0)));
+                                }
+                                btn
+                            })
                             // Chat toggle — show/hide the right sidebar.
                             // Same place + behaviour as the web's chat-toggle.
                             // Sits to the LEFT of the auth pill.
@@ -1317,6 +1390,21 @@ impl Render for AppView {
                         .occlude(),
                 )
                 .with_priority(11)
+                .into_any_element(),
+                None => div().into_any_element(),
+            })
+            .child(match self.planning.clone() {
+                Some(planning) => deferred(
+                    div()
+                        .absolute()
+                        .top_0()
+                        .left_0()
+                        .size_full()
+                        .bg(rgb(0x0a0a0d))
+                        .child(planning)
+                        .occlude(),
+                )
+                .with_priority(12)
                 .into_any_element(),
                 None => div().into_any_element(),
             })

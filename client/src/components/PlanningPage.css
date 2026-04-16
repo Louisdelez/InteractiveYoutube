@@ -1,0 +1,427 @@
+.pl-page {
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(circle at 10% -10%, rgba(155, 89, 182, 0.1), transparent 50%),
+    radial-gradient(circle at 90% 10%, rgba(80, 150, 230, 0.06), transparent 50%),
+    #0a0a0d;
+  color: #efeff1;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ─── Header ─────────────────────────────────────────── */
+.pl-header {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 16px 28px;
+  background: rgba(13, 13, 16, 0.92);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  z-index: 5;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+}
+
+.pl-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #efeff1;
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.pl-back:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+.pl-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: #f4f4f6;
+  letter-spacing: -0.01em;
+}
+
+.pl-channel-select {
+  background: #17171b;
+  color: #efeff1;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 7px 12px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+.pl-channel-select:hover { border-color: rgba(155, 89, 182, 0.5); }
+.pl-channel-select:focus { border-color: #9b59b6; }
+
+.pl-week-nav {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #17171b;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 4px;
+}
+
+.pl-week-btn {
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  color: #d0d0d4;
+  border: none;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.pl-week-btn:hover:not(:disabled) {
+  background: rgba(155, 89, 182, 0.15);
+  color: #fff;
+}
+.pl-week-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.pl-week-label {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #e8e8ea;
+  min-width: 180px;
+  line-height: 1.2;
+}
+.pl-week-range {
+  font-size: 0.72rem;
+  color: #8a8a90;
+  font-weight: 500;
+  margin-top: 3px;
+}
+
+.pl-error,
+.pl-loading {
+  padding: 60px;
+  text-align: center;
+  color: #888;
+  font-size: 0.95rem;
+}
+
+/* ─── Grid wrapper (scroll container) ───────────────── */
+.pl-grid-wrap {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  position: relative;
+  scrollbar-color: #333 transparent;
+  scrollbar-width: thin;
+}
+.pl-grid-wrap::-webkit-scrollbar { width: 10px; height: 10px; }
+.pl-grid-wrap::-webkit-scrollbar-track { background: transparent; }
+.pl-grid-wrap::-webkit-scrollbar-thumb {
+  background: #2a2a30;
+  border-radius: 5px;
+  border: 2px solid #0a0a0d;
+}
+.pl-grid-wrap::-webkit-scrollbar-thumb:hover { background: #3a3a40; }
+
+.pl-grid {
+  display: grid;
+  grid-template-columns: 70px repeat(7, 1fr);
+  min-height: 100%;
+  position: relative;
+}
+
+/* ─── Hour ruler (sticky left column) ────────────────── */
+.pl-hours {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: #0a0a0d;
+  border-right: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.pl-hours-spacer {
+  /* same height as the day header row; sticky so it stays visible when
+     scrolling — and ranks higher than the now-line so the label reads
+     cleanly over the hour ruler. */
+  height: 72px;
+  position: sticky;
+  top: 0;
+  background: #0a0a0d;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  z-index: 21;
+}
+
+.pl-hour {
+  position: relative;
+  display: flex;
+  justify-content: flex-end;
+  padding-right: 10px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #5a5a62;
+  border-top: 1px solid rgba(255, 255, 255, 0.03);
+  user-select: none;
+  font-variant-numeric: tabular-nums;
+}
+.pl-hour:first-child { border-top: none; }
+.pl-hour span {
+  transform: translateY(-9px);
+}
+
+/* ─── Day columns ───────────────────────────────────── */
+.pl-day {
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid rgba(255, 255, 255, 0.04);
+  min-width: 0;
+}
+.pl-day:last-child { border-right: none; }
+.pl-day-today {
+  background: linear-gradient(180deg, rgba(155, 89, 182, 0.04), rgba(155, 89, 182, 0.01) 40%);
+}
+
+.pl-day-header {
+  position: sticky;
+  top: 0;
+  height: 72px;
+  background: #0f0f13;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  /* High enough to stay above scrolling video blocks (which can have
+     z-index up to 4 on hover and 3 for the EN DIRECT current block). */
+  z-index: 20;
+}
+.pl-day-today .pl-day-header {
+  /* Stack a semi-transparent purple tint over the fully-opaque base so
+     the header reads purple BUT stays opaque — otherwise scrolling
+     blocks would show through the translucent gradient and visually
+     "climb over" today's header. */
+  background:
+    linear-gradient(180deg, rgba(155, 89, 182, 0.35), rgba(155, 89, 182, 0.12) 90%),
+    #0f0f13;
+  border-bottom-color: rgba(155, 89, 182, 0.5);
+}
+
+.pl-day-name {
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #c8c8cc;
+}
+.pl-day-today .pl-day-name { color: #efddff; }
+
+.pl-day-date {
+  font-size: 0.74rem;
+  color: #8a8a90;
+  font-weight: 500;
+}
+.pl-day-today .pl-day-date { color: #d4afe6; }
+
+.pl-day-today-badge {
+  /* Inline, not absolutely positioned — avoids covering the day name
+     when the header column is narrow. Sits below the date line. */
+  margin-top: 2px;
+  font-size: 0.56rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: #9b59b6;
+  color: #fff;
+  padding: 2px 8px;
+  border-radius: 999px;
+  line-height: 1;
+}
+
+.pl-day-column {
+  position: relative;
+  min-height: 100%;
+}
+
+.pl-day-grid-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.03);
+  pointer-events: none;
+}
+
+/* ─── Video blocks ───────────────────────────────────── */
+.pl-block {
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  background: linear-gradient(180deg, rgba(155, 89, 182, 0.85) 0%, rgba(124, 63, 153, 0.9) 100%);
+  color: #fff;
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 0.76rem;
+  line-height: 1.25;
+  overflow: hidden;
+  text-decoration: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  /* Inset shadow only — no outer shadow that could bleed onto the
+     neighbouring block's gap. */
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  transition: background 0.15s ease, border-color 0.15s ease;
+  cursor: pointer;
+}
+.pl-block:hover {
+  background: linear-gradient(180deg, rgba(172, 109, 199, 0.98) 0%, rgba(141, 79, 171, 0.98) 100%);
+  border-color: rgba(255, 255, 255, 0.25);
+  z-index: 4;
+}
+
+.pl-block-time {
+  font-size: 0.72rem;
+  font-weight: 700;
+  opacity: 0.9;
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.pl-block-title {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Currently-playing block: red fill + strong inset border. No outer
+   shadow/ring so the surrounding 6 px gap stays intact. */
+.pl-block-current {
+  background: linear-gradient(180deg, #ef4444 0%, #dc2626 100%);
+  border-color: rgba(255, 255, 255, 0.45);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18);
+  z-index: 3;
+}
+.pl-block-current:hover {
+  background: linear-gradient(180deg, #f87171 0%, #ef4444 100%);
+}
+
+.pl-block-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-top: 2px;
+}
+
+.pl-live-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 4px #fff;
+  animation: pl-live-pulse 1.3s ease-in-out infinite;
+}
+
+@keyframes pl-live-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+/* ─── Now line — spans all 7 day columns + the hour ruler ────── */
+.pl-now-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: #ef4444;
+  z-index: 15;
+  pointer-events: none;
+  box-shadow: 0 0 8px rgba(239, 68, 68, 0.7);
+}
+.pl-now-line::before {
+  /* Dot on the far-left end, aligned with the hour ruler. */
+  content: '';
+  position: absolute;
+  left: 62px;
+  top: -3px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ef4444;
+  box-shadow: 0 0 10px #ef4444;
+  animation: pl-live-pulse 1.6s ease-in-out infinite;
+}
+.pl-now-label {
+  /* Sits at the very left over the hour ruler column. */
+  position: absolute;
+  left: 6px;
+  top: -12px;
+  background: #ef4444;
+  color: #fff;
+  padding: 2px 8px 2px 6px;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.55);
+  font-variant-numeric: tabular-nums;
+  z-index: 25;
+}
+
+/* ─── Footer ────────────────────────────────────────── */
+.pl-footer {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 28px;
+  background: rgba(13, 13, 16, 0.9);
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  font-size: 0.8rem;
+  color: #8a8a90;
+  flex-shrink: 0;
+}
+.pl-footer-avatar {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+@media (max-width: 1100px) {
+  .pl-grid { grid-template-columns: 56px repeat(7, minmax(140px, 1fr)); }
+  .pl-header { padding: 12px 16px; gap: 10px; }
+  .pl-day-name { font-size: 0.76rem; }
+  .pl-block-title { font-size: 0.7rem; }
+}
