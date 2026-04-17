@@ -1,9 +1,9 @@
 use gpui::*;
-use gpui_component::input::{Input, InputEvent, InputState};
 use std::collections::{HashMap, VecDeque};
 use std::sync::Arc;
 use crate::models::message::ChatMessage;
 use crate::services::emoji_data;
+use crate::views::emoji_input::{EmojiInput, EmojiInputSubmit};
 
 const MAX_MESSAGES: usize = 500;
 const RENDER_WINDOW: usize = 60;
@@ -19,17 +19,11 @@ impl EventEmitter<ChatSend> for ChatView {}
 pub struct ChatView {
     pub messages: VecDeque<ChatMessage>,
     pub viewer_count: usize,
-    input_state: Entity<InputState>,
+    emoji_input: Entity<EmojiInput>,
     show_emoji: bool,
-    /// Selected category index (0..categories().len()).
     emoji_category: usize,
-    /// Lazy image cache keyed by emoji unicode-code (e.g. `1f600`). Loads from
-    /// `assets/emoji-png/{code}.png` (Apple style, 64×64) on first request.
     emoji_cache: HashMap<String, Arc<Image>>,
-    /// Scroll handle for the messages list — used to auto-scroll to the
-    /// latest message after every push / replace.
     messages_scroll: ScrollHandle,
-    /// Icon cache (just the eye icon for now, used in the viewer count).
     icons: crate::views::icons::IconCache,
     #[allow(dead_code)]
     _subs: Vec<Subscription>,
@@ -45,34 +39,20 @@ fn emoji_png_path(u: &str) -> String {
 }
 
 impl ChatView {
-    pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
-        let input_state = cx.new(|cx| {
-            InputState::new(window, cx).placeholder("Envoyer un message...")
-        });
+    pub fn new(_window: &mut Window, cx: &mut Context<Self>) -> Self {
+        let emoji_input = cx.new(|cx| EmojiInput::new(cx));
 
-        let input_handle = input_state.clone();
-        let sub = cx.subscribe_in(
-            &input_state,
-            window,
-            move |_this: &mut Self, _state, ev: &InputEvent, window, cx| {
-                if let InputEvent::PressEnter { .. } = ev {
-                    let text = input_handle.read(cx).value().to_string();
-                    let trimmed = text.trim();
-                    if !trimmed.is_empty() {
-                        cx.emit(ChatSend { text: trimmed.to_string() });
-                        // Clear input
-                        input_handle.update(cx, |s, cx| {
-                            s.set_value("", window, cx);
-                        });
-                    }
-                }
+        let sub = cx.subscribe(
+            &emoji_input,
+            move |_this: &mut Self, _input, ev: &EmojiInputSubmit, cx| {
+                cx.emit(ChatSend { text: ev.0.clone() });
             },
         );
 
         Self {
             messages: VecDeque::with_capacity(MAX_MESSAGES + 1),
             viewer_count: 0,
-            input_state,
+            emoji_input,
             show_emoji: false,
             emoji_category: 0,
             emoji_cache: HashMap::new(),
@@ -128,11 +108,10 @@ impl ChatView {
 }
 
 impl ChatView {
-    fn append_to_input(&self, emoji: &str, window: &mut Window, cx: &mut Context<Self>) {
-        let mut next = self.input_state.read(cx).value().to_string();
-        next.push_str(emoji);
-        self.input_state.update(cx, |s, cx| {
-            s.set_value(next, window, cx);
+    fn append_to_input(&self, emoji: &str, _window: &mut Window, cx: &mut Context<Self>) {
+        self.emoji_input.update(cx, |input, cx| {
+            input.append(emoji);
+            cx.notify();
         });
     }
 
@@ -147,6 +126,47 @@ impl ChatView {
         self.emoji_cache.insert(u.to_string(), img.clone());
         Some(img)
     }
+
+    /// Render text with emoji characters replaced by Apple PNG images
+    /// inline. `size` is the emoji image size in px.
+    fn render_rich_text(&mut self, text: &str, emoji_size: f32) -> Div {
+        let segments = emoji_data::segment_text(text);
+        let has_emoji = segments.iter().any(|s| matches!(s, emoji_data::TextSegment::Emoji(_)));
+        if !has_emoji {
+            return div().text_color(rgb(0xefeff1)).child(text.to_string());
+        }
+        let mut row = div()
+            .flex()
+            .flex_row()
+            .flex_wrap()
+            .items_center()
+            .text_color(rgb(0xefeff1));
+        for seg in segments {
+            match seg {
+                emoji_data::TextSegment::Text(t) => {
+                    row = row.child(t);
+                }
+                emoji_data::TextSegment::Emoji(u) => {
+                    if let Some(img_data) = self.emoji_image(&u) {
+                        row = row.child(
+                            img(img_data)
+                                .size(px(emoji_size))
+                                .flex_shrink_0()
+                        );
+                    } else {
+                        row = row.child(emoji_data::unicode_from_u(&u));
+                    }
+                }
+            }
+        }
+        row
+    }
+
+    /// Render message body in chat (16 px emojis).
+    fn render_message_body(&mut self, text: &str) -> Div {
+        self.render_rich_text(text, 16.0)
+    }
+
 }
 
 impl Render for ChatView {
@@ -228,8 +248,20 @@ impl Render for ChatView {
                             // a VecDeque iterator walks indices in
                             // contiguous memory — no intermediate Vec.
                             let start = self.messages.len().saturating_sub(RENDER_WINDOW);
-                            self.messages.iter().skip(start).map(|msg| {
-                                let color = parse_hex_color(&msg.color).unwrap_or(0xaaaaaa);
+                            {
+                            // Collect message data first (immutable borrow
+                            // on self.messages), then render bodies
+                            // separately (mutable borrow for emoji cache).
+                            let msg_data: Vec<_> = self.messages
+                                .iter()
+                                .skip(start)
+                                .map(|msg| (msg.time.clone(), msg.username.clone(), msg.color.clone(), msg.text.clone()))
+                                .collect();
+                            let rendered: Vec<_> = msg_data.iter().map(|(_, _, _, text)| {
+                                self.render_message_body(text)
+                            }).collect();
+                            msg_data.into_iter().zip(rendered).map(|((time, username, color, _), body)| {
+                                let color = parse_hex_color(&color).unwrap_or(0xaaaaaa);
                                 div()
                                     .px_2()
                                     .py(px(2.0))
@@ -241,21 +273,18 @@ impl Render for ChatView {
                                             .child(
                                                 div()
                                                     .text_color(rgb(0x666666))
-                                                    .child(msg.time.clone())
+                                                    .child(time)
                                             )
                                             .child(
                                                 div()
                                                     .font_weight(FontWeight::SEMIBOLD)
                                                     .text_color(rgb(color))
-                                                    .child(msg.username.clone())
+                                                    .child(username)
                                             )
-                                            .child(
-                                                div()
-                                                    .text_color(rgb(0xefeff1))
-                                                    .child(msg.text.clone())
-                                            )
+                                            .child(body)
                                     )
                             })
+                            }
                         })
                 }
             )
@@ -399,24 +428,24 @@ impl Render for ChatView {
                                 .justify_center()
                                 .rounded(px(4.0))
                                 .cursor_pointer()
-                                .text_size(px(16.0))
-                                .text_color(rgb(0xaaaaaa))
-                                .hover(|this| this.bg(rgb(0x2d2d30)).text_color(rgb(0xefeff1)))
-                                .child("😊")
+                                .hover(|this| this.bg(rgb(0x2d2d30)))
+                                .child({
+                                    if let Some(smiley) = self.emoji_image("1f60a") {
+                                        img(smiley).size(px(20.0)).into_any_element()
+                                    } else {
+                                        div().text_size(px(16.0)).text_color(rgb(0xaaaaaa)).child("😊").into_any_element()
+                                    }
+                                })
                                 .on_click(cx.listener(|this: &mut ChatView, _, _, cx| {
                                     this.show_emoji = !this.show_emoji;
                                     cx.notify();
                                 }))
                         )
                         .child(
-                            div().flex_1().child(Input::new(&self.input_state))
+                            div().flex_1().child(self.emoji_input.clone())
                         )
                         .child({
-                            // Send button — mirrors the web's purple "Chat"
-                            // button. Reads the current input value, emits
-                            // ChatSend if non-empty, then clears the field.
-                            // Same effect as pressing Enter.
-                            let input_handle = self.input_state.clone();
+                            let input_handle = self.emoji_input.clone();
                             div()
                                 .id("chat-send-btn")
                                 .px_3()
@@ -432,13 +461,13 @@ impl Render for ChatView {
                                 .cursor_pointer()
                                 .hover(|this| this.bg(rgb(0xac6dc7)))
                                 .child("Chat")
-                                .on_click(cx.listener(move |_this: &mut ChatView, _, window, cx| {
-                                    let text = input_handle.read(cx).value().to_string();
-                                    let trimmed = text.trim();
-                                    if trimmed.is_empty() { return; }
-                                    cx.emit(ChatSend { text: trimmed.to_string() });
+                                .on_click(cx.listener(move |_this: &mut ChatView, _, _window, cx| {
+                                    let text = input_handle.read(cx).text().trim().to_string();
+                                    if text.is_empty() { return; }
+                                    cx.emit(ChatSend { text });
                                     input_handle.update(cx, |s, cx| {
-                                        s.set_value("", window, cx);
+                                        s.clear();
+                                        cx.notify();
                                     });
                                 }))
                         })

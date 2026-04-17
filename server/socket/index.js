@@ -5,7 +5,7 @@ const config = require('../config');
 const { redisPub, redisSub, redis } = require('../services/redis');
 const { registerTvHandlers, startSyncBroadcast, stopSyncBroadcast } = require('./tv');
 const { getTvState } = require('../services/tv');
-const { registerChatHandlers, stopBatching } = require('./chat');
+const { registerChatHandlers, stopBatching, getHistory } = require('./chat');
 const { findUserById } = require('../db');
 const log = require('../services/logger');
 const metrics = require('../services/metrics');
@@ -176,6 +176,11 @@ function setupSocketIO(httpServer) {
     if (initialState) {
       socket.emit('tv:state', initialState);
     }
+    // Send chat history for the same channel (was hardcoded to
+    // CHANNELS[0] in chat.js — same Amixem bug).
+    getHistory(defaultChannel)
+      .then((history) => socket.emit('chat:history', history))
+      .catch(() => {});
     socket.emit('viewers:count', {
       count: await redis.scard(viewerSetKey(defaultChannel)),
     });

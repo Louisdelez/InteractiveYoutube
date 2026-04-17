@@ -11,10 +11,11 @@ const { generatePseudo, generateColor } = require('../services/pseudo');
  * render text right-to-left (spoofing usernames, hiding code, etc).
  */
 function sanitizeText(input) {
-  // Drop C0/C1 controls (except \n \t which we don't want either in
-  // chat anyway), zero-width chars, BOM, RTL override.
+  // Drop C0/C1 controls, zero-width spaces (but NOT the Zero-Width
+  // Joiner U+200D which is essential for combined emoji like
+  // 👨‍💻 👩‍❤️‍👨 😶‍🌫️), BOM, bidi overrides.
   return input.replace(
-    /[\u0000-\u001F\u007F-\u009F\u200B-\u200F\u202A-\u202E\u2066-\u2069\uFEFF]/g,
+    /[\u0000-\u001F\u007F-\u009F\u200B\u200C\u200E\u200F\u202A-\u202E\u2066-\u2069\uFEFF]/g,
     ''
   );
 }
@@ -110,11 +111,10 @@ const anonymousColors = new Map();
 function registerChatHandlers(io, socket, user) {
   startBatching(io);
 
-  // Send chat history for default channel
-  const defaultChannel = config.CHANNELS[0].id;
-  getHistory(defaultChannel)
-    .then((history) => socket.emit('chat:history', history))
-    .catch((err) => log.error({ err: err.message }, 'failed to load chat history'));
+  // NOTE: initial chat:history emission was moved to socket/index.js
+  // (after `joinChannel()`) so `socket.currentChannel` is set. The
+  // old code here used CHANNELS[0] (Amixem) regardless of which room
+  // the socket was actually joined to.
 
   // When channel changes, send new history. Validate channelId.
   socket.on('chat:channelChanged', (channelId) => {
@@ -246,4 +246,4 @@ async function clearAllChatHistory(io) {
   return keys.length;
 }
 
-module.exports = { registerChatHandlers, stopBatching, clearAllChatHistory };
+module.exports = { registerChatHandlers, stopBatching, clearAllChatHistory, getHistory };

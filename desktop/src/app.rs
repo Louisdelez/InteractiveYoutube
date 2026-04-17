@@ -24,6 +24,14 @@ pub struct AppView {
     chat: Entity<ChatView>,
     hovered_channel: Option<String>,
     current_channel_id: Option<String>,
+    /// Channel id the client has asked the server to switch to, but whose
+    /// confirming `tv:state` hasn't arrived yet. While this is `Some(id)`,
+    /// any `tv:state` / `tv:sync` for a DIFFERENT channel is dropped —
+    /// it's the stale initial-state the server emits on every socket
+    /// (re)connect for its randomly-chosen default room, which would
+    /// otherwise yank us off our channel for a fraction of a second
+    /// before our SwitchChannel round-trips.
+    pending_channel_switch: Option<String>,
     /// Raw avatar bytes per channel id, kept around so the player's
     /// "now playing" badge can blit them without re-fetching.
     avatar_bytes: std::collections::HashMap<String, Vec<u8>>,
@@ -106,6 +114,10 @@ impl AppView {
                         return;
                     }
                     this.current_channel_id = Some(event.channel_id.clone());
+                    // Also arm the pending-switch guard so any stale
+                    // tv:state arriving while the server processes our
+                    // request is dropped.
+                    this.pending_channel_switch = Some(event.channel_id.clone());
                     // Push the new channel's name + avatar to the
                     // X11 "now playing" badge.
                     #[cfg(target_os = "linux")]
@@ -401,9 +413,61 @@ impl AppView {
                             for ev in events {
                                 match ev {
                                     ServerEvent::TvState(state) | ServerEvent::TvSync(state) => {
-                                        // Both events are full state snapshots. load_state
-                                        // handles "same video → just seek if drift" and
-                                        // "different video → reload" internally.
+                                        // Strict policy: the server NEVER gets to change
+                                        // our chaîne on its own. A state for a DIFFERENT
+                                        // channel than what we're watching is accepted
+                                        // ONLY if the user (or a reconnect re-assert)
+                                        // explicitly asked for that channel via
+                                        // `pending_channel_switch`. Anything else — the
+                                        // server's initial random-room emit, a tv:sync
+                                        // delivered to our socket while the server still
+                                        // thinks we're in a different room, a nodemon
+                                        // restart dropping us in Amixem — is silently
+                                        // ignored. Updates for the SAME channel always
+                                        // pass through (they carry drift corrections
+                                        // and auto-advance to the next video in the
+                                        // playlist).
+                                        let mut accept = true;
+                                        if let Some(e) = entity_for_status.upgrade() {
+                                            e.update(cx, |this, _cx| {
+                                                let same_channel = this
+                                                    .current_channel_id
+                                                    .as_deref()
+                                                    == Some(state.channel_id.as_str());
+                                                let user_asked_for = this
+                                                    .pending_channel_switch
+                                                    .as_deref()
+                                                    == Some(state.channel_id.as_str());
+                                                if same_channel {
+                                                    // drift / auto-advance — accept
+                                                } else if user_asked_for {
+                                                    // confirming our SwitchChannel
+                                                    this.pending_channel_switch = None;
+                                                } else if this.current_channel_id.is_none() {
+                                                    // First-ever state: no previous
+                                                    // chaîne to preserve — accept and
+                                                    // anchor here.
+                                                } else {
+                                                    // Unsolicited channel change
+                                                    // attempted by the server. Drop it
+                                                    // and re-assert our real chaîne so
+                                                    // the server brings us back.
+                                                    accept = false;
+                                                }
+                                            });
+                                        }
+                                        if !accept {
+                                            if let Some(e) = entity_for_status.upgrade() {
+                                                e.update(cx, |this, _cx| {
+                                                    if let Some(ref ch) = this.current_channel_id {
+                                                        this.pending_channel_switch = Some(ch.clone());
+                                                        let _ = cmd_tx_for_pseudo
+                                                            .send(ClientCommand::SwitchChannel(ch.clone()));
+                                                    }
+                                                });
+                                            }
+                                            continue;
+                                        }
                                         player_u.update(cx, |p, cx| p.load_state(&state, cx));
                                     }
                                     ServerEvent::ChatMessage { username, text, color, time } => {
@@ -459,6 +523,7 @@ impl AppView {
                                             e.update(cx, |this, cx| {
                                                 this.connected = true;
                                                 remembered_channel = this.current_channel_id.clone();
+                                                this.pending_channel_switch = remembered_channel.clone();
                                                 cx.notify();
                                             });
                                         }
@@ -660,6 +725,7 @@ impl AppView {
                 chat,
                 hovered_channel: None,
                 current_channel_id: initial_channel_id,
+                pending_channel_switch: None,
                 avatar_bytes: std::collections::HashMap::new(),
                 connected: false,
                 latency_ms: None,
