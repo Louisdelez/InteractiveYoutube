@@ -182,6 +182,12 @@ impl PlanningView {
         v
     }
 
+    pub fn on_playlist_updated(&mut self, channel_id: &str, cx: &mut Context<Self>) {
+        if channel_id == self.selected_channel_id {
+            self.start_fetch(cx);
+        }
+    }
+
     fn start_fetch(&mut self, cx: &mut Context<Self>) {
         self.loading = true;
         self.playlist = None;

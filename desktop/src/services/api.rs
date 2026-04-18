@@ -204,6 +204,38 @@ pub fn fetch_playlist(channel_id: &str) -> Result<PlaylistInfo, String> {
     resp.json::<PlaylistInfo>().map_err(|e| e.to_string())
 }
 
+#[derive(Debug, Clone, Deserialize)]
+pub struct GifResult {
+    pub id: String,
+    #[serde(default)]
+    pub title: String,
+    pub gif_url: String,
+    pub preview_url: String,
+    #[serde(default = "default_gif_dim")]
+    pub width: u32,
+    #[serde(default = "default_gif_dim")]
+    pub height: u32,
+}
+fn default_gif_dim() -> u32 { 100 }
+
+pub fn fetch_trending_gifs() -> Result<Vec<GifResult>, String> {
+    let url = format!("{}/api/gifs/trending", SERVER_URL);
+    let resp = client()?.get(&url).send().map_err(|e| e.to_string())?;
+    if !resp.status().is_success() {
+        return Err(format!("HTTP {}", resp.status()));
+    }
+    resp.json::<Vec<GifResult>>().map_err(|e| e.to_string())
+}
+
+pub fn search_gifs(query: &str) -> Result<Vec<GifResult>, String> {
+    let url = format!("{}/api/gifs/search?q={}", SERVER_URL, query);
+    let resp = client()?.get(&url).send().map_err(|e| e.to_string())?;
+    if !resp.status().is_success() {
+        return Err(format!("HTTP {}", resp.status()));
+    }
+    resp.json::<Vec<GifResult>>().map_err(|e| e.to_string())
+}
+
 pub fn fetch_channels() -> Result<Vec<ServerChannel>, String> {
     let url = format!("{}/api/tv/channels", SERVER_URL);
     let resp = client()?.get(&url).send().map_err(|e| e.to_string())?;

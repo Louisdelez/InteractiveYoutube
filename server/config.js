@@ -20,6 +20,9 @@ const config = {
   CHAT_BATCH_INTERVAL_MS: 150,
   CHAT_RATE_WINDOW_MS: 5000,
   CHAT_RATE_MAX_MESSAGES: 5,
+  // Tenor v2 GIF API — uses a Google Cloud API key (same type as YouTube).
+  // Falls back to the YouTube key if not set separately.
+  TENOR_API_KEY: process.env.TENOR_API_KEY || 'AIzaSyAyimkuYQYF_FXVALexPuGQctUWRURdCYQ',
   REDIS_URL: process.env.REDIS_URL || 'redis://localhost:6379',
   DATABASE_URL: process.env.DATABASE_URL || 'postgresql://interactiveyoutube:interactiveyoutube@localhost:5432/interactiveyoutube',
   // Where the web fallback points users who hit a non-embeddable video.
@@ -201,6 +204,15 @@ const config = {
       ],
       avatar: 'https://yt3.ggpht.com/c--lELNYgWqiCWmZsdNwHVn7vj0IecE6RM_MLEnFopPnfMuE4MO0OCPyTD12cNmEvgeKdDJVew=s160-c-k-c0x00ffffff-no-rj',
     },
+    { id: 'what-the-cut', name: 'What the Cut', handle: 'MrAntoineDaniel',
+      youtubeChannelIds: ['UCtI6_1vGanPlH5lgVIDjJGQ'],
+      avatar: 'https://yt3.ggpht.com/ytc/AIdro_kRdyCH6MmWSuY9WJsXaBNNK8uvDPY0ayuBe3YGr-QIDDg=s160-c-k-c0x00ffffff-no-rj' },
+    { id: 'micode', name: 'Micode', handle: 'Micode',
+      youtubeChannelIds: ['UCYnvxJ-PKiGXo_tYXpWAC-w'],
+      avatar: 'https://yt3.ggpht.com/FWRkKi2u2NSqVBOyenh-Q0qpqpk562aVx6SMH-Caw6QIeZmAIFcwdA3mdpNnwW-Qm-XZHXPr=s160-c-k-c0x00ffffff-no-rj' },
+    { id: 'underscore', name: 'Underscore', handle: 'Underscore_',
+      youtubeChannelIds: ['UCWedHS9qKebauVIK2J7383g'],
+      avatar: 'https://yt3.ggpht.com/RUb9pWwhDr8-uv4WTOOvn_c6cc1K5yHa2dPrOx7nqT8K2Ez1wYnVUQO_4PCJwMxOtZGg9vvZbw=s160-c-k-c0x00ffffff-no-rj' },
   ],
 };
 

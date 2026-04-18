@@ -24,7 +24,22 @@ const ChatMessage = memo(function ChatMessage({ message }) {
         {message.registered && <span className="chat-badge" title="Compte verifie">&#9733;</span>}
         {message.username}
       </span>
-      <span className="chat-text">{message.text}</span>
+      {message.text.startsWith('[gif:') && message.text.endsWith(']')
+        ? <img
+            src={message.text.slice(5, -1)}
+            className="chat-gif"
+            alt="GIF"
+            loading="lazy"
+          />
+        : message.text.startsWith('[sticker:') && message.text.endsWith(']')
+        ? <img
+            src={`/stickers/${message.text.slice(9, -1)}`}
+            className="chat-sticker"
+            alt="Sticker"
+            loading="lazy"
+          />
+        : <span className="chat-text">{message.text}</span>
+      }
     </div>
   );
 });

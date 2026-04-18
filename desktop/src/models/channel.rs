@@ -116,5 +116,11 @@ pub fn get_channels() -> Vec<Channel> {
         ch("noob", "Noob", "NoobleretourOfficiel", ""),
         ch("popcorn", "Popcorn", "Popcorn-officiel",
             "https://yt3.ggpht.com/c--lELNYgWqiCWmZsdNwHVn7vj0IecE6RM_MLEnFopPnfMuE4MO0OCPyTD12cNmEvgeKdDJVew=s160-c-k-c0x00ffffff-no-rj"),
+        ch("what-the-cut", "What the Cut", "MrAntoineDaniel",
+            "https://yt3.ggpht.com/ytc/AIdro_kRdyCH6MmWSuY9WJsXaBNNK8uvDPY0ayuBe3YGr-QIDDg=s160-c-k-c0x00ffffff-no-rj"),
+        ch("micode", "Micode", "Micode",
+            "https://yt3.ggpht.com/FWRkKi2u2NSqVBOyenh-Q0qpqpk562aVx6SMH-Caw6QIeZmAIFcwdA3mdpNnwW-Qm-XZHXPr=s160-c-k-c0x00ffffff-no-rj"),
+        ch("underscore", "Underscore", "Underscore_",
+            "https://yt3.ggpht.com/RUb9pWwhDr8-uv4WTOOvn_c6cc1K5yHa2dPrOx7nqT8K2Ez1wYnVUQO_4PCJwMxOtZGg9vvZbw=s160-c-k-c0x00ffffff-no-rj"),
     ]
 }

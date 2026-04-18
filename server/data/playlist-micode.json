@@ -1,0 +1,593 @@
+{
+  "channelId": "micode",
+  "videos": [
+    {
+      "videoId": "4xq6bVbS-Pw",
+      "title": "La Fabrique à Idiots",
+      "duration": 2304,
+      "embeddable": true,
+      "publishedAt": "2026-01-15T13:00:20Z"
+    },
+    {
+      "videoId": "mKGFsDbvBsA",
+      "title": "Comment corrompre un fonctionnaire ?",
+      "duration": 2417,
+      "embeddable": true,
+      "publishedAt": "2025-12-20T15:57:51Z"
+    },
+    {
+      "videoId": "2wMxldl3Alk",
+      "title": "Le complot le plus grave de la tech française",
+      "duration": 2939,
+      "embeddable": true,
+      "publishedAt": "2025-11-26T17:51:32Z"
+    },
+    {
+      "videoId": "8vnutj0Mrc4",
+      "title": "L'infiltration impossible que personne n'avait vue venir",
+      "duration": 2169,
+      "embeddable": false,
+      "publishedAt": "2025-09-22T17:24:03Z"
+    },
+    {
+      "videoId": "90QU1zK6kM4",
+      "title": "J’ai infiltré une pyramide de Ponzi",
+      "duration": 4010,
+      "embeddable": false,
+      "publishedAt": "2025-07-30T14:19:04Z"
+    },
+    {
+      "videoId": "Vj4474vTtQ8",
+      "title": "Comment un selfie a fait tomber un empire criminel",
+      "duration": 1886,
+      "embeddable": false,
+      "publishedAt": "2025-06-12T17:16:06Z"
+    },
+    {
+      "videoId": "ag6-52_1SDA",
+      "title": "Les 24h qui ont changé l'histoire du crime organisé",
+      "duration": 2724,
+      "embeddable": false,
+      "publishedAt": "2025-04-29T10:15:00Z"
+    },
+    {
+      "videoId": "QJwVUExjlC0",
+      "title": "Le hacker qui avait 6h d'avance sur Wall Street",
+      "duration": 2673,
+      "embeddable": false,
+      "publishedAt": "2025-03-31T13:00:35Z"
+    },
+    {
+      "videoId": "dS01AoUF1xo",
+      "title": "Pourquoi les criminels achètent ces téléphones 6000$ ?",
+      "duration": 2589,
+      "embeddable": false,
+      "publishedAt": "2025-02-28T17:39:44Z"
+    },
+    {
+      "videoId": "gXtp6C-3JKo",
+      "title": "Le virus le plus flippant de l'Histoire",
+      "duration": 2482,
+      "embeddable": false,
+      "publishedAt": "2024-12-27T17:25:20Z"
+    },
+    {
+      "videoId": "WQBLPYToLME",
+      "title": "L'attaque informatique la plus sophistiquée de l'Histoire",
+      "duration": 1741,
+      "embeddable": false,
+      "publishedAt": "2024-11-05T17:35:26Z"
+    },
+    {
+      "videoId": "W5ThRimqb2U",
+      "title": "Le hacker devenu millionnaire en truquant la loterie",
+      "duration": 1966,
+      "embeddable": false,
+      "publishedAt": "2024-09-16T16:37:50Z"
+    },
+    {
+      "videoId": "iL5LC0a7KJY",
+      "title": "Comment blanchir de l'argent ?",
+      "duration": 2657,
+      "embeddable": false,
+      "publishedAt": "2024-07-29T17:16:14Z"
+    },
+    {
+      "videoId": "9YRk_7pYWXo",
+      "title": "Le jour où un employé a rançonné son propre patron | L'affaire Ubiquiti",
+      "duration": 1486,
+      "embeddable": false,
+      "publishedAt": "2024-07-02T17:17:13Z"
+    },
+    {
+      "videoId": "ZkMP6YD52L8",
+      "title": "Le hacker qui a exposé 37 millions de maris infidèles",
+      "duration": 2194,
+      "embeddable": false,
+      "publishedAt": "2024-06-21T15:29:37Z"
+    },
+    {
+      "videoId": "8LHEwkV7QpY",
+      "title": "Comment disparaître d'Internet ?",
+      "duration": 2193,
+      "embeddable": false,
+      "publishedAt": "2024-04-22T17:30:49Z"
+    },
+    {
+      "videoId": "KoRFf7zjmmc",
+      "title": "YouTube est en train de perdre la guerre la plus épique d’Internet",
+      "duration": 1200,
+      "embeddable": false,
+      "publishedAt": "2024-01-31T18:17:50Z"
+    },
+    {
+      "videoId": "LvnjQQKj11M",
+      "title": "Le téléchargement illégal cache-t-il vraiment des virus ?",
+      "duration": 1571,
+      "embeddable": false,
+      "publishedAt": "2023-11-16T20:37:41Z"
+    },
+    {
+      "videoId": "SyamXfBVjrM",
+      "title": "Les développeurs doivent-ils avoir peur de GPT5 ?",
+      "duration": 1563,
+      "embeddable": false,
+      "publishedAt": "2023-08-29T18:32:38Z"
+    },
+    {
+      "videoId": "9aYgKQDOjI0",
+      "title": "J'ai envoyé 10246 CVs avec un bot, voici ce que j'ai appris",
+      "duration": 1140,
+      "embeddable": false,
+      "publishedAt": "2023-07-07T16:48:35Z"
+    },
+    {
+      "videoId": "6Jv0EzXdQbk",
+      "title": "J'ai infiltré un réseau d'arnaqueurs au SMS",
+      "duration": 3476,
+      "embeddable": false,
+      "publishedAt": "2023-05-30T19:11:27Z"
+    },
+    {
+      "videoId": "4daO2QM12WY",
+      "title": "Comment retrouver n'importe qui sur Internet ?",
+      "duration": 1156,
+      "embeddable": false,
+      "publishedAt": "2023-05-15T18:35:12Z"
+    },
+    {
+      "videoId": "FDnH4NVKHco",
+      "title": "J'ai fouillé des disques durs sur Leboncoin ! (encore)",
+      "duration": 1111,
+      "embeddable": false,
+      "publishedAt": "2022-12-04T17:00:07Z"
+    },
+    {
+      "videoId": "RBWQP3gVauY",
+      "title": "Comment cette île du Pacifique gagne des millions",
+      "duration": 666,
+      "embeddable": false,
+      "publishedAt": "2022-11-06T16:00:22Z"
+    },
+    {
+      "videoId": "CqhcntD1JN4",
+      "title": "J’ai matché 10246 filles avec un bot, voici ce j’ai appris",
+      "duration": 982,
+      "embeddable": false,
+      "publishedAt": "2022-10-09T12:36:20Z"
+    },
+    {
+      "videoId": "B1HCOiq5izk",
+      "title": "Un gars a trouvé mon adresse grâce à StreetView",
+      "duration": 1118,
+      "embeddable": false,
+      "publishedAt": "2022-06-30T18:40:53Z"
+    },
+    {
+      "videoId": "ADF2vMkvN8c",
+      "title": "Comment le dark mode vous gâche la vie",
+      "duration": 373,
+      "embeddable": false,
+      "publishedAt": "2022-06-12T14:45:00Z"
+    },
+    {
+      "videoId": "vIyBFpdFHRM",
+      "title": "J'ai créé un réseau social basé sur la haine.",
+      "duration": 984,
+      "embeddable": false,
+      "publishedAt": "2022-05-22T15:15:46Z"
+    },
+    {
+      "videoId": "oFSXvd1oCNA",
+      "title": "Ne lancez SURTOUT PAS cette commande",
+      "duration": 502,
+      "embeddable": false,
+      "publishedAt": "2022-05-05T15:00:23Z"
+    },
+    {
+      "videoId": "6F7tlwmdjbY",
+      "title": "J'ai créé un bot qui m'a causé des problèmes...",
+      "duration": 1350,
+      "embeddable": false,
+      "publishedAt": "2022-03-10T17:12:54Z"
+    },
+    {
+      "videoId": "zKfdjsK7VAI",
+      "title": "Cette théorie du complot est vraie.",
+      "duration": 906,
+      "embeddable": false,
+      "publishedAt": "2022-02-12T11:09:03Z"
+    },
+    {
+      "videoId": "uAsf6YN96P0",
+      "title": "J'ai codé ces 3 applis (n'appelez pas la police svp)",
+      "duration": 950,
+      "embeddable": false,
+      "publishedAt": "2022-01-09T13:00:32Z"
+    },
+    {
+      "videoId": "q2zJF7P7BHA",
+      "title": "J'ai appris à crocheter des serrures en 3O jours",
+      "duration": 944,
+      "embeddable": false,
+      "publishedAt": "2021-12-21T16:15:06Z"
+    },
+    {
+      "videoId": "udYtHVEwbYA",
+      "title": "J’ai retracé un compte insta grâce à la trigonométrie",
+      "duration": 999,
+      "embeddable": false,
+      "publishedAt": "2021-11-08T18:37:58Z"
+    },
+    {
+      "videoId": "hZbVW04Ohjk",
+      "title": "Le piratage le plus mystérieux de l'histoire",
+      "duration": 770,
+      "embeddable": false,
+      "publishedAt": "2021-10-06T16:35:02Z"
+    },
+    {
+      "videoId": "LN9n2vGkZyQ",
+      "title": "Cette appli va BOULEVERSER votre vie",
+      "duration": 456,
+      "embeddable": false,
+      "publishedAt": "2021-09-09T17:07:38Z"
+    },
+    {
+      "videoId": "xf_cKTlOYLo",
+      "title": "LA VÉRITÉ SUR LE DISQUE DUR VOLÉ DE LEBONCOIN (personne n’est prêt) 3/3",
+      "duration": 1589,
+      "embeddable": false,
+      "publishedAt": "2021-07-23T22:40:06Z"
+    },
+    {
+      "videoId": "aOBVZUL1iBA",
+      "title": "J'AI FOUILLÉ LE MYSTÉRIEUX DISQUE DUR DE LEBONCOIN (vous êtes pas prêts) 2/3",
+      "duration": 1206,
+      "embeddable": false,
+      "publishedAt": "2021-07-21T18:08:19Z"
+    },
+    {
+      "videoId": "vt8PyQ2PGxI",
+      "title": "J'AI FOUILLÉ DES DISQUES DURS SUR LEBONCOIN (j'étais pas prêt) 1/3",
+      "duration": 988,
+      "embeddable": false,
+      "publishedAt": "2021-05-26T20:27:47Z"
+    },
+    {
+      "videoId": "Q0c1CJT8X8A",
+      "title": "La vérité sur l'entreprise Shadow",
+      "duration": 1458,
+      "embeddable": false,
+      "publishedAt": "2021-04-14T15:40:44Z"
+    },
+    {
+      "videoId": "ZmtSfognYus",
+      "title": "J’AI CRÉÉ UN BOT TINDER ! (et il marche vraiment)",
+      "duration": 990,
+      "embeddable": false,
+      "publishedAt": "2021-03-24T08:43:08Z"
+    },
+    {
+      "videoId": "QusWiuRsi4k",
+      "title": "Pourquoi les émissions en direct coûtent si cher ?",
+      "duration": 809,
+      "embeddable": false,
+      "publishedAt": "2021-03-02T15:59:05Z"
+    },
+    {
+      "videoId": "tnHRms-Jy6k",
+      "title": "APPLE VA DÉTESTER MON \"MAC\"... 😈",
+      "duration": 769,
+      "embeddable": false,
+      "publishedAt": "2021-02-15T18:32:47Z"
+    },
+    {
+      "videoId": "xR7R2MAgfyE",
+      "title": "LES ANTIVIRUS GRATUITS VOUS MENTENT ?",
+      "duration": 1024,
+      "embeddable": false,
+      "publishedAt": "2020-12-21T17:11:15Z"
+    },
+    {
+      "videoId": "zuDtOgAWADI",
+      "title": "Le côté obscur du \"Cloud\"",
+      "duration": 437,
+      "embeddable": false,
+      "publishedAt": "2020-12-15T21:17:48Z"
+    },
+    {
+      "videoId": "DBnStqiLB-Q",
+      "title": "J'ai inventé un nouveau format vidéo ! (qui fait crash ton iPhone 😅)",
+      "duration": 318,
+      "embeddable": false,
+      "publishedAt": "2020-10-11T12:32:19Z"
+    },
+    {
+      "videoId": "Yy1CNnN6mjs",
+      "title": "DÉMONSTRATION : Extraction de mot de passe par l'audio",
+      "duration": 502,
+      "embeddable": false,
+      "publishedAt": "2020-09-30T19:23:10Z"
+    },
+    {
+      "videoId": "9qKf8NEnjB8",
+      "title": "J'ai créé une MONSTRUOSITÉ",
+      "duration": 674,
+      "embeddable": false,
+      "publishedAt": "2020-09-21T17:01:24Z"
+    },
+    {
+      "videoId": "yvOHKF6wFfc",
+      "title": "APPLE SHORTCUTS VU PAR UN DÉVELOPPEUR ! (comment dire...)",
+      "duration": 606,
+      "embeddable": false,
+      "publishedAt": "2020-09-10T16:10:34Z"
+    },
+    {
+      "videoId": "ckZGQ5cLIfs",
+      "title": "NordVPN vous ment. (non sponsorisé)",
+      "duration": 633,
+      "embeddable": false,
+      "publishedAt": "2020-07-20T20:27:10Z"
+    },
+    {
+      "videoId": "RrnUh9WRdhY",
+      "title": "JE VAIS RÉVOLUTIONNER LE YOUTUBE GAME ! (à priori)",
+      "duration": 491,
+      "embeddable": false,
+      "publishedAt": "2020-06-25T20:34:20Z"
+    },
+    {
+      "videoId": "_c3NH4Di5zs",
+      "title": "Le sombre trafic de \"hits\"",
+      "duration": 690,
+      "embeddable": false,
+      "publishedAt": "2020-06-19T17:19:04Z"
+    },
+    {
+      "videoId": "Tr7O3OwJVZ0",
+      "title": "VOUS ÊTES DES GÉNIES",
+      "duration": 580,
+      "embeddable": false,
+      "publishedAt": "2020-02-16T10:32:00Z"
+    },
+    {
+      "videoId": "AzhnqtQKKHM",
+      "title": "J'ai créé un bot pour Uber Eats",
+      "duration": 604,
+      "embeddable": false,
+      "publishedAt": "2020-02-12T17:39:05Z"
+    },
+    {
+      "videoId": "rGWwOlsb1Ns",
+      "title": "LA FACE CACHÉE DE N26",
+      "duration": 438,
+      "embeddable": false,
+      "publishedAt": "2020-02-08T16:20:35Z"
+    },
+    {
+      "videoId": "crnCudRa3wc",
+      "title": "J'ai créé un plugin MAGIQUE pour Shadow",
+      "duration": 491,
+      "embeddable": false,
+      "publishedAt": "2019-12-03T18:34:00Z"
+    },
+    {
+      "videoId": "pD8r9hIVEu8",
+      "title": "J'ai 24h pour re-coder le site de Tesla... (quasi-impossible)",
+      "duration": 499,
+      "embeddable": false,
+      "publishedAt": "2019-07-29T15:38:07Z"
+    },
+    {
+      "videoId": "5vCdM4RvoiQ",
+      "title": "J'AI INFILTRÉ UN RÉSEAU D'ARNAQUEURS 3/3",
+      "duration": 2007,
+      "embeddable": false,
+      "publishedAt": "2019-04-19T15:00:00Z"
+    },
+    {
+      "videoId": "0M4k-j-8LXY",
+      "title": "J'AI INFILTRÉ UN RÉSEAU D'ARNAQUEURS 2/3",
+      "duration": 1717,
+      "embeddable": false,
+      "publishedAt": "2019-04-05T15:02:35Z"
+    },
+    {
+      "videoId": "gbYdQOde6EU",
+      "title": "J'AI INFILTRÉ UN RÉSEAU D'ARNAQUEURS 1/3",
+      "duration": 1220,
+      "embeddable": false,
+      "publishedAt": "2019-03-31T09:04:58Z"
+    },
+    {
+      "videoId": "LAd2yLRxIQ0",
+      "title": "PIRATER LA WEBCAM D'AMIXEM (bonus)",
+      "duration": 552,
+      "embeddable": false,
+      "publishedAt": "2019-01-01T15:04:32Z"
+    },
+    {
+      "videoId": "gCSc4EsakFI",
+      "title": "LE CARDING SUR LE DARK WEB",
+      "duration": 431,
+      "embeddable": false,
+      "publishedAt": "2018-12-05T16:44:12Z"
+    },
+    {
+      "videoId": "_1ONcmFUOxE",
+      "title": "On a trouvé des mots de passe",
+      "duration": 437,
+      "embeddable": false,
+      "publishedAt": "2018-11-02T16:17:36Z"
+    },
+    {
+      "videoId": "BhebeWurUQM",
+      "title": "CE CHEVAL DE TROIE EST INDÉTECTABLE DES ANTIVIRUS ?!",
+      "duration": 399,
+      "embeddable": false,
+      "publishedAt": "2018-09-27T15:42:40Z"
+    },
+    {
+      "videoId": "I5jZWXbFP5c",
+      "title": "10 FAUX CONSEILS POUR ÊTRE UNE GROSSE CYBER-VICTIME",
+      "duration": 156,
+      "embeddable": false,
+      "publishedAt": "2018-09-20T15:30:00Z"
+    },
+    {
+      "videoId": "fi3ZJeH4Fww",
+      "title": "N'ouvre SURTOUT pas ce mail",
+      "duration": 243,
+      "embeddable": false,
+      "publishedAt": "2018-09-13T15:33:36Z"
+    },
+    {
+      "videoId": "sWacAjBY2JM",
+      "title": "La SNCF va détester mon bot...",
+      "duration": 539,
+      "embeddable": false,
+      "publishedAt": "2018-09-06T15:00:04Z"
+    },
+    {
+      "videoId": "PC8fxc_tN3Q",
+      "title": "ON A FABRIQUÉ UN MINI ABRIBUS CONNECTÉ",
+      "duration": 531,
+      "embeddable": false,
+      "publishedAt": "2018-06-14T15:19:58Z"
+    },
+    {
+      "videoId": "bK6lSFZCTFw",
+      "title": "J'ai hacké ma Nintendo Switch ! (trop stylé)",
+      "duration": 341,
+      "embeddable": false,
+      "publishedAt": "2018-05-14T16:13:49Z"
+    },
+    {
+      "videoId": "04RSTYM7828",
+      "title": "J'ai discuté avec le pirate de YouTube !",
+      "duration": 530,
+      "embeddable": false,
+      "publishedAt": "2018-04-13T17:00:31Z"
+    },
+    {
+      "videoId": "BafmroCsYQ8",
+      "title": "Quel est le pire antivirus ?",
+      "duration": 394,
+      "embeddable": false,
+      "publishedAt": "2018-02-24T15:00:01Z"
+    },
+    {
+      "videoId": "gY8iadTROcA",
+      "title": "CRACKER LE WIFI DES VOISINS ?",
+      "duration": 472,
+      "embeddable": false,
+      "publishedAt": "2018-01-05T17:30:00Z"
+    },
+    {
+      "videoId": "C_b2TEGGLgU",
+      "title": "LE GRAAL DES HACKERS - SAFECODE",
+      "duration": 279,
+      "embeddable": false,
+      "publishedAt": "2017-11-13T16:02:03Z"
+    },
+    {
+      "videoId": "Q0pVwsZ8cyI",
+      "title": "Cet escroc a trouvé comment gagner des millions",
+      "duration": 475,
+      "embeddable": false,
+      "publishedAt": "2017-10-27T15:00:02Z"
+    },
+    {
+      "videoId": "RKtY3zT0Eg4",
+      "title": "PIÉGÉE PAR FABIEN OLICARD AU TÉLÉPHONE - SAFECODE",
+      "duration": 489,
+      "embeddable": false,
+      "publishedAt": "2017-10-17T14:30:00Z"
+    },
+    {
+      "videoId": "-Eltzklm5Vs",
+      "title": "La tragique erreur du créateur d'AlphaBay",
+      "duration": 291,
+      "embeddable": false,
+      "publishedAt": "2017-10-15T16:00:00Z"
+    },
+    {
+      "videoId": "b4kjwa4Ageo",
+      "title": "Comment marche Face ID ?",
+      "duration": 300,
+      "embeddable": false,
+      "publishedAt": "2017-09-15T16:29:49Z"
+    },
+    {
+      "videoId": "opBSsNDnAc4",
+      "title": "3 idées reçues sur Linux",
+      "duration": 374,
+      "embeddable": false,
+      "publishedAt": "2017-08-14T15:36:36Z"
+    },
+    {
+      "videoId": "nIRDzPnJAro",
+      "title": "La vérité sur WannaCry.",
+      "duration": 295,
+      "embeddable": false,
+      "publishedAt": "2017-05-20T14:30:01Z"
+    },
+    {
+      "videoId": "cUrmG335e7o",
+      "title": "SE FAIRE HACKER AU MCDO",
+      "duration": 263,
+      "embeddable": false,
+      "publishedAt": "2017-04-23T14:00:02Z"
+    },
+    {
+      "videoId": "T3NeuhpaPk0",
+      "title": "UN VIRUS ME DEMANDE UNE RANÇON - SAFECODE",
+      "duration": 230,
+      "embeddable": false,
+      "publishedAt": "2017-02-09T17:31:10Z"
+    },
+    {
+      "videoId": "5OpjvsWZRTk",
+      "title": "JE HACK MA SŒUR PAR USB ! - SAFECODE",
+      "duration": 197,
+      "embeddable": false,
+      "publishedAt": "2017-01-29T17:39:19Z"
+    },
+    {
+      "videoId": "3VTPmkg3WFY",
+      "title": "Ne cliquez surtout pas sur \"Enregistrer\"",
+      "duration": 161,
+      "embeddable": false,
+      "publishedAt": "2017-01-21T16:39:10Z"
+    },
+    {
+      "videoId": "wjiDO1pITyM",
+      "title": "J'AI HACKÉ DES ARNAQUEURS SUR LEBONCOIN",
+      "duration": 237,
+      "embeddable": false,
+      "publishedAt": "2017-01-15T22:12:44Z"
+    }
+  ]
+}

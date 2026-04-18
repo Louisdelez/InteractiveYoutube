@@ -41,13 +41,22 @@ const CATEGORY_ORDER: &[&str] = &[
     "flags",
 ];
 
-static CACHE: OnceLock<Vec<EmojiCategory>> = OnceLock::new();
-
-pub fn categories() -> &'static [EmojiCategory] {
-    CACHE.get_or_init(load).as_slice()
+struct AllData {
+    categories: Vec<EmojiCategory>,
+    reverse: ReverseData,
 }
 
-fn load() -> Vec<EmojiCategory> {
+static ALL: OnceLock<AllData> = OnceLock::new();
+
+fn all_data() -> &'static AllData {
+    ALL.get_or_init(load_all)
+}
+
+pub fn categories() -> &'static [EmojiCategory] {
+    &all_data().categories
+}
+
+fn load_all() -> AllData {
     let v: serde_json::Value = serde_json::from_str(RAW).expect("emojis-fr.json invalid");
     let cats = v.get("categories").and_then(|c| c.as_object());
     let emojis_val = v.get("emojis").and_then(|e| e.as_object());
@@ -90,12 +99,12 @@ fn load() -> Vec<EmojiCategory> {
         });
     }
 
-    // Scan ALL PNGs and add those missing from the JSON into extra
-    // categories: "Teintes de peau" (skin tone variants) and
-    // "Combinaisons" (ZWJ sequences, other extras).
+    // Single scan of emoji-png dir: build extra categories AND the
+    // reverse lookup map in one pass (avoids double fs::read_dir).
     let emoji_dir = format!("{}/assets/emoji-png", env!("CARGO_MANIFEST_DIR"));
     let mut skin_tones: Vec<Emoji> = Vec::new();
     let mut combos: Vec<Emoji> = Vec::new();
+    let mut reverse_map: HashMap<String, String> = HashMap::new();
     if let Ok(entries) = std::fs::read_dir(&emoji_dir) {
         let mut codes: Vec<String> = entries
             .flatten()
@@ -107,6 +116,20 @@ fn load() -> Vec<EmojiCategory> {
             })
             .collect();
         codes.sort();
+        for code in &codes {
+            let unicode = unicode_from_u(code);
+            if unicode.is_empty() {
+                continue;
+            }
+            reverse_map.insert(unicode.clone(), code.clone());
+            let stripped: String = unicode
+                .chars()
+                .filter(|c| *c != '\u{fe0f}')
+                .collect();
+            if stripped != unicode && !stripped.is_empty() {
+                reverse_map.entry(stripped).or_insert_with(|| code.clone());
+            }
+        }
         for code in codes {
             if known.contains(&code) {
                 continue;
@@ -143,7 +166,13 @@ fn load() -> Vec<EmojiCategory> {
         });
     }
 
-    out
+    let mut sorted: Vec<(String, String)> = reverse_map.into_iter().collect();
+    sorted.sort_by(|a, b| b.0.len().cmp(&a.0.len()));
+
+    AllData {
+        categories: out,
+        reverse: ReverseData { sorted },
+    }
 }
 
 /// Convert a `u` string (e.g. `1f1eb-1f1f7`) into the actual emoji string.
@@ -164,38 +193,8 @@ struct ReverseData {
     sorted: Vec<(String, String)>, // (unicode_string, codepoint_name)
 }
 
-static REVERSE: OnceLock<ReverseData> = OnceLock::new();
-
-fn build_reverse() -> ReverseData {
-    let emoji_dir = format!("{}/assets/emoji-png", env!("CARGO_MANIFEST_DIR"));
-    let mut map: HashMap<String, String> = HashMap::new();
-    if let Ok(entries) = std::fs::read_dir(&emoji_dir) {
-        for entry in entries.flatten() {
-            let name = entry.file_name();
-            let s = name.to_string_lossy();
-            if let Some(code) = s.strip_suffix(".png") {
-                let unicode = unicode_from_u(code);
-                if unicode.is_empty() {
-                    continue;
-                }
-                map.insert(unicode.clone(), code.to_string());
-                let stripped: String = unicode
-                    .chars()
-                    .filter(|c| *c != '\u{fe0f}')
-                    .collect();
-                if stripped != unicode && !stripped.is_empty() {
-                    map.entry(stripped).or_insert_with(|| code.to_string());
-                }
-            }
-        }
-    }
-    let mut sorted: Vec<(String, String)> = map.into_iter().collect();
-    sorted.sort_by(|a, b| b.0.len().cmp(&a.0.len()));
-    ReverseData { sorted }
-}
-
 fn reverse_data() -> &'static ReverseData {
-    REVERSE.get_or_init(build_reverse)
+    &all_data().reverse
 }
 
 /// Segment types produced by `segment_text`.

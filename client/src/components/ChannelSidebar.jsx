@@ -56,6 +56,9 @@ const CHANNELS_FALLBACK = [
   { id: 'cocadmin', name: 'Cocadmin', avatar: 'https://yt3.googleusercontent.com/YIxkspwrV9jPGhnm9owGVaFkHWWOZ4kuvYBh9b8S7pcRhuophuweM9AZuqQrkw0cDANM8pKN7w=s160-c-k-c0x00ffffff-no-rj' },
   { id: 'noob', name: 'Noob', avatar: '/avatars/noob.jpg' },
   { id: 'popcorn', name: 'Popcorn', avatar: 'https://yt3.ggpht.com/c--lELNYgWqiCWmZsdNwHVn7vj0IecE6RM_MLEnFopPnfMuE4MO0OCPyTD12cNmEvgeKdDJVew=s160-c-k-c0x00ffffff-no-rj' },
+  { id: 'what-the-cut', name: 'What the Cut', avatar: 'https://yt3.ggpht.com/ytc/AIdro_kRdyCH6MmWSuY9WJsXaBNNK8uvDPY0ayuBe3YGr-QIDDg=s160-c-k-c0x00ffffff-no-rj' },
+  { id: 'micode', name: 'Micode', avatar: 'https://yt3.ggpht.com/FWRkKi2u2NSqVBOyenh-Q0qpqpk562aVx6SMH-Caw6QIeZmAIFcwdA3mdpNnwW-Qm-XZHXPr=s160-c-k-c0x00ffffff-no-rj' },
+  { id: 'underscore', name: 'Underscore', avatar: 'https://yt3.ggpht.com/RUb9pWwhDr8-uv4WTOOvn_c6cc1K5yHa2dPrOx7nqT8K2Ez1wYnVUQO_4PCJwMxOtZGg9vvZbw=s160-c-k-c0x00ffffff-no-rj' },
 ].sort((a, b) => a.name.localeCompare(b.name, 'fr'));
 // Note: the fetched list is sorted at fetch-time; this const is the fallback.
 

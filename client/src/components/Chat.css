@@ -74,13 +74,6 @@
   position: relative;
 }
 
-.chat-emoji-picker {
-  position: absolute;
-  bottom: 50px;
-  left: 0;
-  right: 0;
-  z-index: 10;
-}
 
 .chat-emoji-btn {
   background: none;
@@ -95,6 +88,10 @@
 
 .chat-emoji-btn:hover {
   color: #bf94ff;
+}
+
+.chat-emoji-btn-active {
+  color: #9147ff;
 }
 
 .chat-input-bar {

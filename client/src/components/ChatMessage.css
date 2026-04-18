@@ -34,3 +34,19 @@
 .chat-text {
   color: #efeff1;
 }
+
+.chat-gif {
+  max-width: 200px;
+  max-height: 150px;
+  border-radius: 4px;
+  display: block;
+  margin-top: 4px;
+}
+
+.chat-sticker {
+  width: 128px;
+  height: 128px;
+  object-fit: contain;
+  display: block;
+  margin-top: 4px;
+}

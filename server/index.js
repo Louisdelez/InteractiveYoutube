@@ -18,6 +18,8 @@ const ytdlpUpdater = require('./services/ytdlp-updater');
 const authRoutes = require('./routes/auth');
 const tvRoutes = require('./routes/tv');
 const userRoutes = require('./routes/user');
+const gifRoutes = require('./routes/gif');
+const { stickerRouter } = require('./routes/gif');
 
 const app = express();
 const server = http.createServer(app);
@@ -54,10 +56,18 @@ app.get('/metrics', async (req, res) => {
   }
 });
 
+// Serve sticker assets (used by web chat to render [sticker:name] messages)
+app.use('/stickers', express.static(path.join(__dirname, '..', 'desktop', 'assets', 'stickers'), {
+  maxAge: '7d',
+  immutable: true,
+}));
+
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/tv', tvRoutes);
 app.use('/api/user', userRoutes);
+app.use('/api/gifs', gifRoutes);
+app.use('/api/stickers', stickerRouter);
 
 // Serve client in production
 if (config.NODE_ENV === 'production') {

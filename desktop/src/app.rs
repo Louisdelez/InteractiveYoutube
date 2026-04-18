@@ -38,6 +38,8 @@ pub struct AppView {
     /// Connection status — derived from `latency_ms`. Kept for the player
     /// overlay logic ("server unavailable" curtain).
     connected: bool,
+    maintenance: bool,
+    maintenance_warning: bool,
     /// Round-trip latency to the server's `/health` endpoint, in milliseconds.
     /// `None` means the last probe failed → server is considered offline.
     latency_ms: Option<u32>,
@@ -133,7 +135,7 @@ impl AppView {
                     // Clear local chat immediately so messages from the
                     // previous channel disappear during the switch.
                     this.chat.update(cx, |c, cx| {
-                        c.replace_messages(Vec::new());
+                        c.replace_messages(Vec::new(), cx);
                         cx.notify();
                     });
                     let _ = cmd_tx_clone.send(ClientCommand::SwitchChannel(event.channel_id.clone()));
@@ -439,19 +441,22 @@ impl AppView {
                                                     .as_deref()
                                                     == Some(state.channel_id.as_str());
                                                 if same_channel {
-                                                    // drift / auto-advance — accept
+                                                    // drift / auto-advance — accept.
+                                                    // Also clear pending if it matches
+                                                    // (reconnect re-assert confirmed).
+                                                    if user_asked_for {
+                                                        this.pending_channel_switch = None;
+                                                    }
                                                 } else if user_asked_for {
                                                     // confirming our SwitchChannel
                                                     this.pending_channel_switch = None;
                                                 } else if this.current_channel_id.is_none() {
-                                                    // First-ever state: no previous
-                                                    // chaîne to preserve — accept and
-                                                    // anchor here.
+                                                    // First-ever state: anchor here
+                                                    // so subsequent stale states are
+                                                    // rejected.
+                                                    this.current_channel_id =
+                                                        Some(state.channel_id.clone());
                                                 } else {
-                                                    // Unsolicited channel change
-                                                    // attempted by the server. Drop it
-                                                    // and re-assert our real chaîne so
-                                                    // the server brings us back.
                                                     accept = false;
                                                 }
                                             });
@@ -472,19 +477,19 @@ impl AppView {
                                     }
                                     ServerEvent::ChatMessage { username, text, color, time } => {
                                         chat_u.update(cx, |c, cx| {
-                                            c.push_message(username, text, color, time);
+                                            c.push_message(username, text, color, time, cx);
                                             cx.notify();
                                         });
                                     }
                                     ServerEvent::ChatHistory(messages) => {
                                         chat_u.update(cx, |c, cx| {
-                                            c.replace_messages(messages);
+                                            c.replace_messages(messages, cx);
                                             cx.notify();
                                         });
                                     }
                                     ServerEvent::ChatCleared => {
                                         chat_u.update(cx, |c, cx| {
-                                            c.replace_messages(Vec::new());
+                                            c.clear_messages(cx);
                                             cx.notify();
                                         });
                                     }
@@ -499,6 +504,42 @@ impl AppView {
                                             e.update(cx, |this, cx| {
                                                 this.total_viewers = total;
                                                 cx.notify();
+                                            });
+                                        }
+                                    }
+                                    ServerEvent::MaintenanceWarning => {
+                                        if let Some(e) = entity_for_status.upgrade() {
+                                            e.update(cx, |this, cx| {
+                                                this.maintenance_warning = true;
+                                                cx.notify();
+                                            });
+                                        }
+                                    }
+                                    ServerEvent::MaintenanceStart => {
+                                        if let Some(e) = entity_for_status.upgrade() {
+                                            e.update(cx, |this, cx| {
+                                                this.maintenance_warning = false;
+                                                this.maintenance = true;
+                                                cx.notify();
+                                            });
+                                        }
+                                    }
+                                    ServerEvent::MaintenanceEnd => {
+                                        if let Some(e) = entity_for_status.upgrade() {
+                                            e.update(cx, |this, cx| {
+                                                this.maintenance = false;
+                                                cx.notify();
+                                            });
+                                        }
+                                    }
+                                    ServerEvent::PlaylistUpdated { channel_id } => {
+                                        if let Some(e) = entity_for_status.upgrade() {
+                                            e.update(cx, |this, cx| {
+                                                if let Some(ref planning) = this.planning {
+                                                    planning.update(cx, |p, cx| {
+                                                        p.on_playlist_updated(&channel_id, cx);
+                                                    });
+                                                }
                                             });
                                         }
                                     }
@@ -529,7 +570,9 @@ impl AppView {
                                         }
                                         if let Some(ch) = remembered_channel {
                                             let _ = cmd_tx_for_pseudo
-                                                .send(ClientCommand::SwitchChannel(ch));
+                                                .send(ClientCommand::SwitchChannel(ch.clone()));
+                                            let _ = cmd_tx_for_pseudo
+                                                .send(ClientCommand::ChatChannelChanged(ch));
                                         }
                                         // Push the per-session anonymous
                                         // pseudo + colour to the server.
@@ -728,6 +771,8 @@ impl AppView {
                 pending_channel_switch: None,
                 avatar_bytes: std::collections::HashMap::new(),
                 connected: false,
+                maintenance: false,
+                maintenance_warning: false,
                 latency_ms: None,
                 frame_times: Rc::new(RefCell::new(std::collections::VecDeque::with_capacity(128))),
                 user: None,
@@ -1242,21 +1287,23 @@ impl Render for AppView {
                                     .get(IconName::Calendar, 14, 0xaaaaaa);
                                 let mut btn = div()
                                     .id("planning-btn")
-                                    .w(px(22.0))
                                     .h(px(22.0))
+                                    .px_2()
                                     .flex()
                                     .items_center()
-                                    .justify_center()
+                                    .gap(px(4.0))
                                     .rounded(px(4.0))
                                     .cursor_pointer()
-                                    .hover(|this| this.bg(rgb(0x26262b)))
+                                    .text_xs()
+                                    .text_color(rgb(0xaaaaaa))
+                                    .hover(|this| this.bg(rgb(0x26262b)).text_color(rgb(0xefeff1)))
                                     .on_click(cx.listener(|this: &mut AppView, _ev: &ClickEvent, window, cx| {
                                         this.open_planning(window, cx);
                                     }));
                                 if let Some(icon) = icon {
                                     btn = btn.child(img(icon).w(px(14.0)).h(px(14.0)));
                                 }
-                                btn
+                                btn.child("Programme")
                             })
                             // Chat toggle — show/hide the right sidebar.
                             // Same place + behaviour as the web's chat-toggle.
@@ -1500,6 +1547,69 @@ impl Render for AppView {
                 .with_priority(12)
                 .into_any_element(),
                 None => div().into_any_element(),
+            })
+            .child(if self.maintenance_warning && !self.maintenance {
+                div()
+                    .absolute()
+                    .bottom_0()
+                    .left_0()
+                    .right_0()
+                    .h(px(32.0))
+                    .bg(rgb(0x9b59b6))
+                    .flex()
+                    .items_center()
+                    .justify_center()
+                    .text_xs()
+                    .font_weight(FontWeight::SEMIBOLD)
+                    .text_color(rgb(0xffffff))
+                    .child("Maintenance dans 5 minutes — le chat sera clear et le serveur redémarre")
+                    .into_any_element()
+            } else {
+                div().into_any_element()
+            })
+            .child(if self.maintenance {
+                deferred(
+                    div()
+                        .absolute()
+                        .top_0()
+                        .left_0()
+                        .size_full()
+                        .bg(gpui::rgba(0x000000cc))
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .child(
+                            div()
+                                .px_6()
+                                .py_4()
+                                .bg(rgb(0x1f1f23))
+                                .rounded(px(12.0))
+                                .border_1()
+                                .border_color(rgb(0x9b59b6))
+                                .flex()
+                                .flex_col()
+                                .items_center()
+                                .gap_2()
+                                .child(
+                                    div()
+                                        .text_lg()
+                                        .font_weight(FontWeight::BOLD)
+                                        .text_color(rgb(0x9b59b6))
+                                        .child("Maintenance en cours")
+                                )
+                                .child(
+                                    div()
+                                        .text_sm()
+                                        .text_color(rgb(0xaaaaaa))
+                                        .child("L'application sera disponible dans quelques instants...")
+                                )
+                        )
+                        .occlude(),
+                )
+                .with_priority(20)
+                .into_any_element()
+            } else {
+                div().into_any_element()
             })
     }
 }

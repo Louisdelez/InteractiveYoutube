@@ -8,6 +8,21 @@ use gpui::*;
 use gpui_component::Root;
 
 fn main() {
+    // Ensure deno (required by yt-dlp for YouTube JS extraction) is in
+    // PATH. yt-dlp looks for it via $PATH; without it, video URLs fail
+    // to resolve silently inside mpv's ytdl_hook.
+    if let Some(home) = std::env::var_os("HOME") {
+        let deno_bin = std::path::PathBuf::from(&home).join(".deno/bin");
+        if deno_bin.exists() {
+            let path = std::env::var_os("PATH").unwrap_or_default();
+            let mut paths = std::env::split_paths(&path).collect::<Vec<_>>();
+            if !paths.contains(&deno_bin) {
+                paths.insert(0, deno_bin);
+                std::env::set_var("PATH", std::env::join_paths(paths).unwrap());
+            }
+        }
+    }
+
     // Keep yt-dlp fresh in the background — download if missing, self-update
     // on launch, then every 6 h. The resolved path is passed to mpv below.
     services::ytdlp_updater::spawn();

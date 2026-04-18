@@ -1,9 +1,9 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import EmojiPicker from 'emoji-picker-react';
-import { Smile } from 'lucide-react';
+import { SmilePlus } from 'lucide-react';
 import { useChat } from '../hooks/useChat';
 import ChatMessage from './ChatMessage';
+import ChatPicker from './ChatPicker';
 import ViewerCount from './ViewerCount';
 import './Chat.css';
 
@@ -11,9 +11,8 @@ export default function Chat({ channelId }) {
   const { messages, viewerCount, sendMessage } = useChat(channelId);
   const [input, setInput] = useState('');
   const [autoScroll, setAutoScroll] = useState(true);
-  const [showEmoji, setShowEmoji] = useState(false);
+  const [showPicker, setShowPicker] = useState(false);
   const parentRef = useRef(null);
-  const emojiRef = useRef(null);
 
   const virtualizer = useVirtualizer({
     count: messages.length,
@@ -98,29 +97,28 @@ export default function Chat({ channelId }) {
       )}
 
       <div className="chat-footer">
-        {showEmoji && (
-          <div className="chat-emoji-picker" ref={emojiRef}>
-            <EmojiPicker
-              onEmojiClick={(emojiData) => {
-                setInput((prev) => prev + emojiData.emoji);
-                setShowEmoji(false);
-              }}
-              theme="dark"
-              height={350}
-              width="100%"
-              searchPlaceholder="Rechercher..."
-              previewConfig={{ showPreview: false }}
-            />
-          </div>
+        {showPicker && (
+          <ChatPicker
+            onEmojiSelect={(emoji) => setInput((prev) => prev + emoji)}
+            onGifSelect={(url) => {
+              sendMessage(`[gif:${url}]`);
+              setShowPicker(false);
+            }}
+            onStickerSelect={(name) => {
+              sendMessage(`[sticker:${name}]`);
+              setShowPicker(false);
+            }}
+            onClose={() => setShowPicker(false)}
+          />
         )}
         <form className="chat-input-bar" onSubmit={handleSend}>
           <button
             type="button"
-            className="chat-emoji-btn"
-            onClick={() => setShowEmoji(!showEmoji)}
-            title="Emojis"
+            className={`chat-emoji-btn ${showPicker ? 'chat-emoji-btn-active' : ''}`}
+            onClick={() => setShowPicker(!showPicker)}
+            title="Emoji, GIF & Stickers"
           >
-            <Smile size={18} />
+            <SmilePlus size={18} />
           </button>
           <input
             type="text"

@@ -51,6 +51,8 @@ export default function App() {
     typeof window !== 'undefined' ? window.location.hash : ''
   );
   const [totalViewers, setTotalViewers] = useState(0);
+  const [maintenance, setMaintenance] = useState(false);
+  const [maintWarning, setMaintWarning] = useState(false);
   const [channels, setChannels] = useState([]);
   // Last-visited channels, most recent first. Capped at 5. Persisted
   // across sessions via localStorage.
@@ -77,8 +79,19 @@ export default function App() {
 
   useEffect(() => {
     const onTotal = ({ total }) => setTotalViewers(total);
+    const onMaintStart = () => { setMaintWarning(false); setMaintenance(true); };
+    const onMaintEnd = () => setMaintenance(false);
+    const onMaintWarn = () => setMaintWarning(true);
     socket.on('viewers:total', onTotal);
-    return () => socket.off('viewers:total', onTotal);
+    socket.on('maintenance:start', onMaintStart);
+    socket.on('maintenance:end', onMaintEnd);
+    socket.on('maintenance:warning', onMaintWarn);
+    return () => {
+      socket.off('viewers:total', onTotal);
+      socket.off('maintenance:start', onMaintStart);
+      socket.off('maintenance:end', onMaintEnd);
+      socket.off('maintenance:warning', onMaintWarn);
+    };
   }, []);
 
   // Fetch the authoritative channel list from the server once, then
@@ -262,6 +275,19 @@ export default function App() {
           onLogin={login}
           onRegister={register}
         />
+      )}
+      {maintWarning && !maintenance && (
+        <div className="maintenance-warning-bar">
+          Maintenance dans 5 minutes — le chat sera clear et le serveur redémarre
+        </div>
+      )}
+      {maintenance && (
+        <div className="maintenance-overlay">
+          <div className="maintenance-box">
+            <div className="maintenance-title">Maintenance en cours</div>
+            <div className="maintenance-text">L'application sera disponible dans quelques instants...</div>
+          </div>
+        </div>
       )}
     </div>
   );

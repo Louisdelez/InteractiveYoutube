@@ -89,6 +89,13 @@
   gap: 12px;
 }
 
+.player-title-col {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
 .player-title {
   color: #efeff1;
   font-size: 0.9rem;
@@ -96,8 +103,14 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  flex: 1;
-  min-width: 0;
+}
+
+.player-date {
+  color: #888;
+  font-size: 0.7rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .player-youtube-link {

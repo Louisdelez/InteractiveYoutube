@@ -9,6 +9,8 @@ export function useChat(channelId) {
   const [viewerCount, setViewerCount] = useState(0);
   const pendingRef = useRef([]);
   const rafRef = useRef(null);
+  const channelRef = useRef(channelId);
+  channelRef.current = channelId;
 
   // Clear messages when channel changes
   useEffect(() => {
@@ -20,6 +22,11 @@ export function useChat(channelId) {
       const pseudo = getOrCreatePseudo();
       const color = getOrCreateColor();
       socket.emit('chat:setAnonymousName', { name: pseudo, color });
+      // Re-assert our channel on reconnect so the server
+      // sends the right chat history (not its random default).
+      if (channelRef.current) {
+        socket.emit('chat:channelChanged', channelRef.current);
+      }
     }
 
     function onHistory(history) {

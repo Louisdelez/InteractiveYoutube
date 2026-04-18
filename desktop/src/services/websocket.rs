@@ -52,6 +52,17 @@ pub enum ServerEvent {
     ViewerTotal {
         total: usize,
     },
+    /// A channel's playlist was updated (new video added, daily refresh).
+    /// Planning views should re-fetch.
+    PlaylistUpdated {
+        channel_id: String,
+    },
+    /// Server maintenance in 5 minutes.
+    MaintenanceWarning,
+    /// Server maintenance started (3am cron).
+    MaintenanceStart,
+    /// Server maintenance ended.
+    MaintenanceEnd,
     Connected,
     Disconnected,
 }
@@ -178,6 +189,32 @@ fn run_socket_loop(events: Sender<ServerEvent>, cmd_rx: Receiver<ClientCommand>)
                             let _ = ev_total.send(ServerEvent::ViewerTotal {
                                 total: total as usize,
                             });
+                        }
+                    }
+                }
+            })
+            .on("maintenance:warning", {
+                let ev = events.clone();
+                move |_, _| { let _ = ev.send(ServerEvent::MaintenanceWarning); }
+            })
+            .on("maintenance:start", {
+                let ev = events.clone();
+                move |_, _| { let _ = ev.send(ServerEvent::MaintenanceStart); }
+            })
+            .on("maintenance:end", {
+                let ev = events.clone();
+                move |_, _| { let _ = ev.send(ServerEvent::MaintenanceEnd); }
+            })
+            .on("tv:playlistUpdated", {
+                let ev = events.clone();
+                move |payload, _| {
+                    if let Payload::Text(values) = payload {
+                        if let Some(v) = values.first() {
+                            if let Some(ch) = v.get("channelId").and_then(|c| c.as_str()) {
+                                let _ = ev.send(ServerEvent::PlaylistUpdated {
+                                    channel_id: ch.to_string(),
+                                });
+                            }
                         }
                     }
                 }

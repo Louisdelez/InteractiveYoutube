@@ -7,6 +7,7 @@ pub mod tooltip;
 pub mod icons;
 pub mod planning;
 pub mod emoji_input;
+pub mod gif_picker;
 #[cfg(target_os = "linux")]
 pub mod popup_menu;
 #[cfg(target_os = "linux")]

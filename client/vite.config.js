@@ -7,6 +7,7 @@ export default defineConfig({
     port: 4501,
     proxy: {
       '/api': 'http://localhost:4500',
+      '/stickers': 'http://localhost:4500',
       '/socket.io': {
         target: 'http://localhost:4500',
         ws: true,

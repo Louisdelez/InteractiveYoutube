@@ -73,6 +73,7 @@ export function useTvSync(channelId) {
     setTvState(null);
 
     socket.emit('tv:switchChannel', channelId);
+    socket.emit('chat:channelChanged', channelId);
 
     const controller = new AbortController();
     api.get(`/api/tv/state?channel=${channelId}`, { signal: controller.signal })

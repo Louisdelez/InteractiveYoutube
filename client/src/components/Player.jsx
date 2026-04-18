@@ -10,6 +10,29 @@ import TauriPlayer from './TauriPlayer';
 import ChannelBadge from './ChannelBadge';
 import './Player.css';
 
+const MONTHS_FR = ['','janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
+const DAYS_FR = ['dimanche','lundi','mardi','mercredi','jeudi','vendredi','samedi'];
+
+function formatPublishedTooltip(iso) {
+  if (!iso) return undefined;
+  try {
+    const d = new Date(iso);
+    if (isNaN(d)) return undefined;
+    const day = DAYS_FR[d.getDay()];
+    const dayUp = day.charAt(0).toUpperCase() + day.slice(1);
+    const label = `${dayUp} ${d.getDate()} ${MONTHS_FR[d.getMonth() + 1]} ${d.getFullYear()}`;
+    const now = new Date();
+    const diffMs = now - d;
+    const diffDays = Math.floor(diffMs / 86400000);
+    let ago;
+    if (diffDays < 1) ago = "aujourd'hui";
+    else if (diffDays < 30) ago = `il y a ${diffDays} jour${diffDays > 1 ? 's' : ''}`;
+    else if (diffDays < 365) { const m = Math.floor(diffDays / 30); ago = `il y a ${m} mois`; }
+    else { const y = Math.floor(diffDays / 365); ago = `il y a ${y} an${y > 1 ? 's' : ''}`; }
+    return `${label} — ${ago}`;
+  } catch { return undefined; }
+}
+
 export default function Player({ channelId, channelMeta, isFavorite, onToggleFavorite }) {
   const { tvState, isLoading, onPlayerReady, onVideoEnd, onVideoError, clockOffset } = useTvSync(channelId);
   // Persisted across F5 via localStorage. Default: not muted, volume 100.
@@ -121,7 +144,12 @@ export default function Player({ channelId, channelMeta, isFavorite, onToggleFav
           <TauriPlayer tvState={tvState} onVideoEnd={onVideoEnd} clockOffset={clockOffset} />
         </div>
         <div className="player-info">
-          <span className="player-title">{tvState.title}</span>
+          <div className="player-title-col">
+            <span className="player-title">{tvState.title}</span>
+            {tvState.publishedAt && (
+              <span className="player-date">{formatPublishedTooltip(tvState.publishedAt)}</span>
+            )}
+          </div>
           <a
             className="player-youtube-link"
             href={`https://www.youtube.com/watch?v=${tvState.videoId}`}
@@ -148,7 +176,12 @@ export default function Player({ channelId, channelMeta, isFavorite, onToggleFav
           <PlayerFallback tvState={tvState} clockOffset={clockOffset} />
         </div>
         <div className="player-info">
-          <span className="player-title">{tvState.title}</span>
+          <div className="player-title-col">
+            <span className="player-title">{tvState.title}</span>
+            {tvState.publishedAt && (
+              <span className="player-date">{formatPublishedTooltip(tvState.publishedAt)}</span>
+            )}
+          </div>
           <a
             className="player-youtube-link"
             href={`https://www.youtube.com/watch?v=${tvState.videoId}`}

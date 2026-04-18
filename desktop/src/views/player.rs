@@ -97,6 +97,64 @@ fn open_in_browser(url: &str) {
     });
 }
 
+/// Format a publishedAt ISO string (e.g. "2019-02-12T15:00:00Z") into
+/// a French tooltip like "Mardi 12 février 2019 — il y a 6 ans".
+fn format_published_tooltip(iso: &str) -> Option<String> {
+    let date_part = iso.get(..10)?;
+    let parts: Vec<&str> = date_part.split('-').collect();
+    if parts.len() != 3 { return None; }
+    let year: i32 = parts[0].parse().ok()?;
+    let month: u32 = parts[1].parse().ok()?;
+    let day: u32 = parts[2].parse().ok()?;
+
+    let months_fr = [
+        "", "janvier", "février", "mars", "avril", "mai", "juin",
+        "juillet", "août", "septembre", "octobre", "novembre", "décembre",
+    ];
+    let days_fr = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"];
+
+    // Zeller-like day of week (Tomohiko Sakamoto)
+    let t = [0i32, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4];
+    let y = if month < 3 { year - 1 } else { year };
+    let dow = ((y + y / 4 - y / 100 + y / 400 + t[month as usize - 1] + day as i32) % 7) as usize;
+    // dow: 0=Sun..6=Sat → convert to 0=Mon..6=Sun
+    let dow_mon = if dow == 0 { 6 } else { dow - 1 };
+    let day_name = days_fr.get(dow_mon).unwrap_or(&"");
+    let month_name = months_fr.get(month as usize).unwrap_or(&"");
+
+    // Time elapsed
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default();
+    let now_year = 1970 + (now.as_secs() / 31_557_600) as i32; // approx
+    let diff_years = now_year - year;
+    let ago = if diff_years >= 2 {
+        format!("il y a {} ans", diff_years)
+    } else if diff_years == 1 {
+        "il y a 1 an".to_string()
+    } else {
+        let now_month = ((now.as_secs() % 31_557_600) / 2_629_800) as u32 + 1;
+        let diff_months = (now_year - year) as u32 * 12 + now_month.saturating_sub(month);
+        if diff_months > 1 {
+            format!("il y a {} mois", diff_months)
+        } else if diff_months == 1 {
+            "il y a 1 mois".to_string()
+        } else {
+            "récente".to_string()
+        }
+    };
+
+    Some(format!(
+        "{} {} {} {} — {}",
+        day_name.chars().next().map(|c| c.to_uppercase().to_string()).unwrap_or_default()
+            + &day_name[1..],
+        day,
+        month_name,
+        year,
+        ago,
+    ))
+}
+
 /// Append a debug line to /tmp/iyt-quality.log (used to diagnose the
 /// dual-quality fallback). Best-effort, never panics.
 fn log_quality(msg: &str) {
@@ -204,6 +262,7 @@ const QUALITIES: &[(&str, &str)] = &[
 
 pub struct PlayerView {
     pub title: String,
+    pub published_at: Option<String>,
     mpv: Arc<Mutex<Mpv>>,
     current_url: String,
     /// Bare YouTube video ID for "open in browser" link. None when the current
@@ -1049,6 +1108,7 @@ impl PlayerView {
 
             Self {
                 title: "Chargement...".to_string(),
+                published_at: None,
                 mpv,
                 current_url: String::new(),
                 current_video_id: None,
@@ -1241,6 +1301,7 @@ impl PlayerView {
             self.current_url = url.clone();
             self.current_video_id = Some(state.video_id.clone());
             self.title = state.title.clone();
+            self.published_at = state.published_at.clone();
             self.queued_next_id = None;
             self.main_first_frame_ready = false;
             // Show the loading overlay until backup OR main is actually
@@ -2074,14 +2135,30 @@ impl Render for PlayerView {
                     .bg(rgb(0x18181b))
                     .border_t_1()
                     .border_color(rgb(BAR_BORDER))
-                    .child(
-                        div()
+                    .child({
+                        let date_label = self.published_at.as_deref()
+                            .and_then(format_published_tooltip);
+                        let mut col = div()
                             .flex_1()
-                            .text_sm()
-                            .text_color(rgb(TEXT_PRIMARY))
+                            .flex()
+                            .flex_col()
                             .overflow_hidden()
-                            .child(self.title.clone()),
-                    );
+                            .child(
+                                div()
+                                    .text_sm()
+                                    .text_color(rgb(TEXT_PRIMARY))
+                                    .child(self.title.clone())
+                            );
+                        if let Some(label) = date_label {
+                            col = col.child(
+                                div()
+                                    .text_size(px(10.0))
+                                    .text_color(rgb(TEXT_MUTED))
+                                    .child(label)
+                            );
+                        }
+                        col
+                    });
                 if let Some(vid) = video_id {
                     let url = format!("https://www.youtube.com/watch?v={}", vid);
                     let mut link = div()

@@ -21,4 +21,5 @@ pub struct TvState {
     pub next_video_id: Option<String>,
     pub next_title: Option<String>,
     pub next_duration: Option<f64>,
+    pub published_at: Option<String>,
 }

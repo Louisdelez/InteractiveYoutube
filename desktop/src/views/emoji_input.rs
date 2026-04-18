@@ -18,6 +18,8 @@ pub struct EmojiInput {
     focus: FocusHandle,
     blink_visible: bool,
     emoji_cache: HashMap<String, Arc<Image>>,
+    cached_bounds: Vec<(usize, usize)>,
+    cached_bounds_text: String,
 }
 
 #[derive(Clone, Debug)]
@@ -54,6 +56,8 @@ impl EmojiInput {
             focus,
             blink_visible: true,
             emoji_cache: HashMap::new(),
+            cached_bounds: Vec::new(),
+            cached_bounds_text: String::new(),
         }
     }
 
@@ -102,11 +106,15 @@ impl EmojiInput {
             .unwrap_or(self.text.len())
     }
 
-    /// Compute byte-offset boundaries for each visual segment (text
-    /// chars individually, emoji as one atomic unit). Returns Vec of
-    /// (start_byte, end_byte).
-    fn visual_boundaries(&self) -> Vec<(usize, usize)> {
-        let segments = emoji_data::segment_text(&self.text);
+    fn invalidate_bounds(&mut self) {
+        if self.cached_bounds_text != self.text {
+            self.cached_bounds_text = self.text.clone();
+            self.cached_bounds = Self::compute_boundaries(&self.text);
+        }
+    }
+
+    fn compute_boundaries(text: &str) -> Vec<(usize, usize)> {
+        let segments = emoji_data::segment_text(text);
         let mut bounds = Vec::new();
         let mut byte_off = 0;
         for seg in &segments {
@@ -131,7 +139,8 @@ impl EmojiInput {
 
     fn move_cursor_left(&mut self) {
         if self.cursor == 0 { return; }
-        let bounds = self.visual_boundaries();
+        self.invalidate_bounds();
+        let bounds = &self.cached_bounds;
         for &(start, end) in bounds.iter().rev() {
             if end <= self.cursor {
                 self.cursor = start;
@@ -147,8 +156,8 @@ impl EmojiInput {
 
     fn move_cursor_right(&mut self) {
         if self.cursor >= self.text.len() { return; }
-        let bounds = self.visual_boundaries();
-        for &(_start, end) in &bounds {
+        self.invalidate_bounds();
+        for &(_start, end) in &self.cached_bounds {
             if end > self.cursor {
                 self.cursor = end;
                 break;
@@ -159,7 +168,8 @@ impl EmojiInput {
 
     fn delete_backward(&mut self) {
         if self.cursor == 0 { return; }
-        let bounds = self.visual_boundaries();
+        self.invalidate_bounds();
+        let bounds = &self.cached_bounds;
         for &(start, end) in bounds.iter().rev() {
             if end <= self.cursor {
                 self.text.drain(start..end);
@@ -177,7 +187,8 @@ impl EmojiInput {
 
     fn delete_forward(&mut self) {
         if self.cursor >= self.text.len() { return; }
-        let bounds = self.visual_boundaries();
+        self.invalidate_bounds();
+        let bounds = self.cached_bounds.clone();
         for &(start, end) in &bounds {
             if start >= self.cursor {
                 self.text.drain(start..end);
@@ -257,14 +268,15 @@ impl EntityInputHandler for EmojiInput {
         cx: &mut Context<Self>,
     ) {
         let range = if let Some(r) = range_utf16 {
-            let start = self.utf16_to_byte(r.start);
-            let end = self.utf16_to_byte(r.end);
+            let mut start = self.utf16_to_byte(r.start).min(self.text.len());
+            let mut end = self.utf16_to_byte(r.end).min(self.text.len());
+            if start > end { std::mem::swap(&mut start, &mut end); }
             start..end
         } else {
             self.cursor..self.cursor
         };
-        let start = range.start.min(self.text.len());
-        let end = range.end.min(self.text.len());
+        let start = range.start;
+        let end = range.end;
         self.text.replace_range(start..end, new_text);
         self.cursor = start + new_text.len();
         self.blink_visible = true;

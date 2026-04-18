@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { ArrowLeft, ChevronLeft, ChevronRight, Clock } from 'lucide-react';
 import { api } from '../services/api';
+import socket from '../services/socket';
 import './PlanningPage.css';
 
 const DAY_NAMES_SHORT = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
@@ -127,15 +128,28 @@ export default function PlanningPage({ onBack, channelId, channels }) {
   useEffect(() => { scrolledToNowRef.current = false; }, [weekOffset, selectedChannelId]);
 
   // Fetch the raw playlist for the selected channel.
-  useEffect(() => {
-    let alive = true;
-    setPlaylist(null);
+  const fetchPlaylist = useCallback(() => {
     setError(null);
     api.get(`/api/tv/playlist?channel=${encodeURIComponent(selectedChannelId)}`)
-      .then((p) => { if (alive) setPlaylist(p); })
-      .catch((err) => { if (alive) setError(err.message || 'Impossible de charger la playlist'); });
-    return () => { alive = false; };
+      .then((p) => setPlaylist(p))
+      .catch((err) => setError(err.message || 'Impossible de charger la playlist'));
   }, [selectedChannelId]);
+
+  useEffect(() => {
+    setPlaylist(null);
+    fetchPlaylist();
+  }, [fetchPlaylist]);
+
+  // Re-fetch when server notifies playlist change (new video added)
+  useEffect(() => {
+    function onUpdated({ channelId }) {
+      if (channelId === selectedChannelId) {
+        fetchPlaylist();
+      }
+    }
+    socket.on('tv:playlistUpdated', onUpdated);
+    return () => socket.off('tv:playlistUpdated', onUpdated);
+  }, [selectedChannelId, fetchPlaylist]);
 
   const weekStart = useMemo(() => {
     const s = startOfWeek(new Date());

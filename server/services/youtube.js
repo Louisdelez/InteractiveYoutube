@@ -211,6 +211,7 @@ async function fetchVideoDetails(videoIds, options = {}) {
           title: item.snippet.title,
           duration,
           embeddable: !!item.status.embeddable,
+          publishedAt: item.snippet.publishedAt || null,
         });
       } else if (isLive) {
         livesFiltered++;
