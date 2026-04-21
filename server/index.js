@@ -8,18 +8,22 @@ const pinoHttp = require('pino-http');
 
 const log = require('./services/logger');
 const metrics = require('./services/metrics');
+const { redis } = require('./services/redis');
 
 const { initDB, shutdown: shutdownDB } = require('./db');
 const { initAllPlaylists } = require('./services/playlist');
-const { setupSocketIO, shutdown: shutdownSocket } = require('./socket');
-const { startCronJobs } = require('./cron/refresh');
-const ytdlpUpdater = require('./services/ytdlp-updater');
+const { setupSocketIO, getIO, shutdown: shutdownSocket } = require('./socket');
+const workerBridge = require('./socket/worker-bridge');
 
 const authRoutes = require('./routes/auth');
 const tvRoutes = require('./routes/tv');
 const userRoutes = require('./routes/user');
 const gifRoutes = require('./routes/gif');
 const { stickerRouter } = require('./routes/gif');
+const logsRoutes = require('./routes/logs');
+const statusRoutes = require('./routes/status');
+const statusService = require('./services/status');
+const adminRoutes = require('./routes/admin');
 
 const app = express();
 const server = http.createServer(app);
@@ -49,6 +53,10 @@ app.get('/health', (req, res) => {
 // Prometheus metrics scrape endpoint.
 app.get('/metrics', async (req, res) => {
   try {
+    // Worker-side counters live in a different process — hydrate them
+    // from Redis right before serializing so Prometheus sees fresh
+    // values (the worker writes to these keys at the end of every run).
+    await metrics.refreshMaintenanceFromRedis(redis);
     res.set('Content-Type', metrics.registry.contentType);
     res.end(await metrics.registry.metrics());
   } catch (err) {
@@ -68,6 +76,12 @@ app.use('/api/tv', tvRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/gifs', gifRoutes);
 app.use('/api/stickers', stickerRouter);
+app.use('/api/logs', logsRoutes);
+// Status endpoints are public and read-only — allow any origin so the
+// standalone status page (hosted on its own subdomain) can poll them
+// without a CORS preflight failure.
+app.use('/api/status', cors({ origin: '*', credentials: false }), statusRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Serve client in production
 if (config.NODE_ENV === 'production') {
@@ -87,6 +101,7 @@ app.use((err, req, res, next) => {
 // Graceful shutdown
 function gracefulShutdown(signal) {
   log.info({ signal }, 'shutting down');
+  workerBridge.stop();
   shutdownSocket();
   server.close(async () => {
     log.info('http server closed');
@@ -115,18 +130,20 @@ async function start() {
   try {
     await initDB();
 
-    // Keep yt-dlp fresh — YouTube extractors break every 2-4 weeks, so we
-    // own a project-local binary and -U it on boot + every 6 h.
-    ytdlpUpdater.start().catch((err) =>
-      log.error({ err: err.message }, 'yt-dlp updater: start failed')
-    );
+    // yt-dlp updates + scheduled maintenance + RSS poll all live in
+    // the worker process (server/workers/*). The web server is pure
+    // HTTP/WS — no setInterval, no cron, no disk writes that could
+    // trigger nodemon restarts mid-operation.
 
     log.info('initialising playlists');
     await initAllPlaylists();
     log.info('all playlists ready');
 
     setupSocketIO(server);
-    startCronJobs();
+    workerBridge.start(getIO());
+
+    await statusService.initStatusSchema();
+    statusService.startCollector();
 
     server.listen(config.PORT, () => {
       log.info({ port: config.PORT }, 'server listening');

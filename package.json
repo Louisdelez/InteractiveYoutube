@@ -2,11 +2,13 @@
   "name": "koala-tv",
   "private": true,
   "scripts": {
-    "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
+    "dev": "concurrently -n web,worker,client -c blue,magenta,green \"npm run dev:server\" \"npm run dev:worker\" \"npm run dev:client\"",
     "dev:server": "cd server && npm run dev",
+    "dev:worker": "cd server && npm run dev:worker",
     "dev:client": "cd client && npm run dev",
     "build": "cd client && npm run build",
     "start": "cd server && npm start",
+    "start:worker": "cd server && npm run start:worker",
     "install:all": "npm install && cd server && npm install && cd ../client && npm install"
   },
   "devDependencies": {

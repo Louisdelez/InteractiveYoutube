@@ -83,6 +83,16 @@ function loadFromDisk(channelId) {
   return false;
 }
 
+/**
+ * Reload a single channel's state from disk. Used by the web to pick
+ * up changes the worker has just persisted (pub/sub event
+ * `koala:playlist-reload`). Silent no-op if the file doesn't exist
+ * yet (first-boot race).
+ */
+function reloadFromDisk(channelId) {
+  return loadFromDisk(channelId);
+}
+
 async function buildPlaylist(channelId, channel) {
   if (channel.ordered && channel.fixedVideoIds) {
     // Fixed video list (e.g., Noob: specific videos in order)
@@ -343,4 +353,5 @@ module.exports = {
   addNewVideos,
   getPlaylist,
   getVideoIds,
+  reloadFromDisk,
 };

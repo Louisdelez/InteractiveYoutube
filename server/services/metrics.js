@@ -36,6 +36,49 @@ const authAttemptsCounter = new client.Counter({
   labelNames: ['kind', 'status'],
 });
 
+// ─── Maintenance (BullMQ worker) ───────────────────────────────
+// The worker runs in a separate process, so prom-client's in-process
+// registry can't see its counters. Instead, the worker writes three
+// Redis keys at the end of every run, and `refreshMaintenanceFromRedis`
+// (called from the web's /metrics handler) syncs them into the
+// web-side gauges right before the Prometheus serialization.
+//
+// Alert on `time() - iy_maintenance_last_success_ts > 93600` (26 h)
+// to catch a silently-skipped nightly run.
+const maintenanceDuration = new client.Gauge({
+  name: 'iy_maintenance_duration_seconds',
+  help: 'Duration of the most recent daily maintenance run, seconds',
+});
+
+const maintenanceLastSuccess = new client.Gauge({
+  name: 'iy_maintenance_last_success_ts',
+  help: 'UNIX timestamp of the last successful daily maintenance run',
+});
+
+const maintenanceLastFailure = new client.Gauge({
+  name: 'iy_maintenance_last_failure_ts',
+  help: 'UNIX timestamp of the last failed daily maintenance run',
+});
+
+const MAINT_LAST_SUCCESS_KEY = 'koala:maint:last_success_ts';
+const MAINT_LAST_FAILURE_KEY = 'koala:maint:last_failure_ts';
+const MAINT_LAST_DURATION_KEY = 'koala:maint:last_duration_sec';
+
+async function refreshMaintenanceFromRedis(redis) {
+  try {
+    const [ok, ko, dur] = await redis.mget(
+      MAINT_LAST_SUCCESS_KEY,
+      MAINT_LAST_FAILURE_KEY,
+      MAINT_LAST_DURATION_KEY
+    );
+    if (ok) maintenanceLastSuccess.set(Number(ok));
+    if (ko) maintenanceLastFailure.set(Number(ko));
+    if (dur) maintenanceDuration.set(Number(dur));
+  } catch {
+    // Redis hiccup — keep last known values, don't blow the scrape up
+  }
+}
+
 module.exports = {
   registry: client.register,
   viewersGauge,
@@ -43,4 +86,11 @@ module.exports = {
   chatMessagesCounter,
   syncBroadcastDuration,
   authAttemptsCounter,
+  maintenanceDuration,
+  maintenanceLastSuccess,
+  maintenanceLastFailure,
+  refreshMaintenanceFromRedis,
+  MAINT_LAST_SUCCESS_KEY,
+  MAINT_LAST_FAILURE_KEY,
+  MAINT_LAST_DURATION_KEY,
 };

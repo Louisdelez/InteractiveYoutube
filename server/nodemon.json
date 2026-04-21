@@ -1,0 +1,12 @@
+{
+  "watch": ["."],
+  "ext": "js,json",
+  "ignore": [
+    "data/**",
+    "logs/**",
+    "../bin/**",
+    "../logs/**",
+    "**/*.test.js"
+  ],
+  "delay": 500
+}

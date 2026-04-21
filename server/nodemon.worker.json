@@ -1,0 +1,11 @@
+{
+  "watch": ["workers", "services", "socket/chat.js", "config.js", "cron"],
+  "ext": "js,json",
+  "ignore": [
+    "data/**",
+    "logs/**",
+    "../bin/**",
+    "../logs/**"
+  ],
+  "delay": 500
+}
