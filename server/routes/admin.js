@@ -9,8 +9,9 @@ const { clearAllChatHistory } = require('../socket/chat');
 const { getIO } = require('../socket');
 const config = require('../config');
 const log = require('../services/logger');
+const { redis } = require('../services/redis');
 const { createConnection } = require('../workers/bullmq-connection');
-const { QUEUE_NAME, JOB_DAILY } = require('../workers/daily-maintenance');
+const { QUEUE_NAME, JOB_DAILY, STATE_KEY } = require('../workers/daily-maintenance');
 
 const router = express.Router();
 
@@ -32,6 +33,7 @@ router.post('/maintenance-reset', loopbackOnly, async (req, res) => {
   try {
     const io = getIO();
     const cleared = await clearAllChatHistory(io);
+    await redis.del(STATE_KEY);
     if (io) io.emit('maintenance:end');
     log.warn({ cleared }, 'admin: maintenance-reset forced');
     res.json({ ok: true, cleared, emitted: ['chat:cleared', 'maintenance:end'] });

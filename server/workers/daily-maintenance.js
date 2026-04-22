@@ -38,6 +38,15 @@ const SCHED_WARNING = 'koala-daily-2h55-warning';
 const CKPT_TTL_SECS = 6 * 3600; // 6 h — orphan cleanup on stuck jobs
 const REFRESH_TIMEOUT_MS = 60_000;
 
+// Server-side source of truth for the maintenance banner. A client
+// that reconnects mid-maintenance (or after missing `maintenance:end`
+// because its websocket blipped at 3 am) can no longer get its banner
+// wedged — `server/socket/index.js` replays the current value on every
+// new connection. TTLs auto-clear stale state if anything crashes.
+const STATE_KEY = 'koala:maint:state';
+const STATE_WARNING_TTL_SECS = 15 * 60;
+const STATE_RUNNING_TTL_SECS = 15 * 60;
+
 const withTimeout = (p, label) =>
   Promise.race([
     p,
@@ -53,6 +62,7 @@ async function runDailyMaintenance(job) {
   const start = Date.now();
 
   log.info({ jobId, attempt: job.attemptsMade + 1 }, 'maintenance: start');
+  await redis.set(STATE_KEY, 'running', 'EX', STATE_RUNNING_TTL_SECS);
   emitter.emit('maintenance:start');
 
   try {
@@ -147,6 +157,7 @@ async function runDailyMaintenance(job) {
     }
 
     // Final: notify clients, clean checkpoint, metrics, optional HC ping
+    await redis.del(STATE_KEY);
     emitter.emit('maintenance:end');
     await redis.del(ckptKey);
 
@@ -180,6 +191,7 @@ async function runDailyMaintenance(job) {
 
 async function runWarning(job) {
   log.info('maintenance warning (T-5 min)');
+  await redis.set(STATE_KEY, 'warning', 'EX', STATE_WARNING_TTL_SECS);
   getEmitter().emit('maintenance:warning', { minutes: 5 });
   return { warned: true };
 }
@@ -265,4 +277,4 @@ async function triggerNow({ delay = 0 } = {}) {
   return { jobId: job.id };
 }
 
-module.exports = { start, triggerNow, QUEUE_NAME, JOB_DAILY };
+module.exports = { start, triggerNow, QUEUE_NAME, JOB_DAILY, STATE_KEY };

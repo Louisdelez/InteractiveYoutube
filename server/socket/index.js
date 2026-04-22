@@ -193,6 +193,19 @@ function setupSocketIO(httpServer) {
       const total = r.reduce((s, [err, n]) => s + (err ? 0 : (n || 0)), 0);
       socket.emit('viewers:total', { total });
     } catch {}
+
+    // Replay current maintenance state so a client reconnecting mid-job
+    // (or after missing the 3 am `maintenance:end` because its websocket
+    // blipped) can't get its banner wedged. The worker writes this key
+    // with a TTL so it also auto-clears if anything crashes.
+    try {
+      const state = await redis.get('koala:maint:state');
+      if (state === 'running') socket.emit('maintenance:start');
+      else if (state === 'warning') socket.emit('maintenance:warning', { minutes: 5 });
+      else socket.emit('maintenance:end'); // idempotent reset
+    } catch {
+      socket.emit('maintenance:end');
+    }
     metrics.connectionsCounter.inc();
     log.info(
       {
