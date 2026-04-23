@@ -1,9 +1,11 @@
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 /// Authoritative TV state from the server. Contains extra metadata fields
 /// (duration, indexes, etc.) that aren't all consumed by the desktop client.
+/// `Serialize` is implemented so the `services::state_cache` module can
+/// persist the per-channel cache to disk for instant-zap across restarts.
 #[allow(dead_code)]
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TvState {
     pub video_id: String,

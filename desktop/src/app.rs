@@ -22,6 +22,12 @@ pub struct AppView {
     sidebar: Entity<SidebarView>,
     player: Entity<PlayerView>,
     chat: Entity<ChatView>,
+    /// FPS counter: timestamps of recent render() calls, rolling 1 s
+    /// window. A 1 s timer in render() re-triggers cx.notify() so the
+    /// counter keeps updating during idle — up from the old 200 ms
+    /// tick so the bare overhead of "forced re-render for telemetry"
+    /// is 5× cheaper.
+    frame_times: std::rc::Rc<std::cell::RefCell<std::collections::VecDeque<std::time::Instant>>>,
     /// (channel_id, channel_name) of the currently hovered sidebar
     /// button. Used by the debounced hover-preload so we can check
     /// "still hovering the same channel 300 ms later?" before kicking
@@ -587,6 +593,32 @@ impl AppView {
             })
             .detach();
 
+            // Periodically snapshot `last_state_per_channel` to disk so
+            // a fresh boot of the app starts with a warm cache. Live
+            // tv:state / tv:sync continue to overwrite entries in
+            // memory throughout the session; we just push the current
+            // view to disk every 30 s. 30 s is long enough to avoid
+            // disk thrashing (tv:sync fires every 15 s per channel) and
+            // short enough that a crash loses at most half a minute of
+            // staleness vs. what we could have persisted.
+            let entity_for_save = cx.entity().downgrade();
+            cx.spawn(async move |_, cx| {
+                loop {
+                    cx.background_executor().timer(Duration::from_secs(30)).await;
+                    let Some(e) = entity_for_save.upgrade() else { break };
+                    let map: std::collections::HashMap<
+                        String,
+                        crate::models::tv_state::TvState,
+                    > = cx.update(|cx| e.read(cx).last_state_per_channel.clone());
+                    if !map.is_empty() {
+                        std::thread::spawn(move || {
+                            crate::services::state_cache::save(&map);
+                        });
+                    }
+                }
+            })
+            .detach();
+
             // Poll the server-event channel from GPUI's executor and dispatch to views
             let rx = Arc::new(Mutex::new(event_rx));
             let player_poll = player.clone();
@@ -979,12 +1011,22 @@ impl AppView {
                 sidebar,
                 player,
                 chat,
+                frame_times: std::rc::Rc::new(std::cell::RefCell::new(
+                    std::collections::VecDeque::with_capacity(128),
+                )),
                 hovered_channel: None,
                 hover_preload_version: std::cell::Cell::new(0),
                 current_channel_id: initial_channel_id,
                 pending_channel_switch: None,
                 avatar_bytes: std::collections::HashMap::new(),
-                last_state_per_channel: std::collections::HashMap::new(),
+                // Bootstrap from the last session's snapshot. Stale
+                // values get overwritten by the HTTP prefetch + live
+                // tv:state / tv:sync stream moments later; having them
+                // present at startup means the very first click before
+                // prefetch completes (~100-500 ms window) still takes
+                // the optimistic instant-zap path instead of waiting
+                // for the server round-trip.
+                last_state_per_channel: crate::services::state_cache::load(),
                 connected: false,
                 maintenance: false,
                 maintenance_warning: false,
@@ -1268,7 +1310,29 @@ impl AppView {
 
 impl Render for AppView {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let _ = cx;
+        // Record this frame and prune entries older than 1 s.
+        let now = std::time::Instant::now();
+        let cutoff = now - std::time::Duration::from_secs(1);
+        {
+            let mut ft = self.frame_times.borrow_mut();
+            ft.push_back(now);
+            while ft.front().map_or(false, |t| *t < cutoff) {
+                ft.pop_front();
+            }
+        }
+        let fps = self.frame_times.borrow().len();
+        // Keep the counter ticking at ~1 Hz even when nothing else
+        // re-renders. 1 s tick instead of the old 200 ms = 5× less
+        // forced work for telemetry.
+        cx.spawn(async move |this, cx| {
+            cx.background_executor()
+                .timer(std::time::Duration::from_secs(1))
+                .await;
+            if let Some(e) = this.upgrade() {
+                let _ = cx.update_entity(&e, |_, cx| cx.notify());
+            }
+        })
+        .detach();
         div()
             .flex()
             .flex_col()
@@ -1641,6 +1705,16 @@ impl Render for AppView {
                                         }
                                     })
                             })
+                            // App FPS — render calls / second rolling 1 s.
+                            // Diagnostic: if it drops below ~30 during
+                            // playback, something's contending the UI
+                            // thread.
+                            .child(
+                                div()
+                                    .text_xs()
+                                    .text_color(rgb(0x888888))
+                                    .child(format!("{} fps", fps)),
+                            )
                     })
             )
             .child({
