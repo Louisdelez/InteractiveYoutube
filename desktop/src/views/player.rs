@@ -1,7 +1,6 @@
 use gpui::*;
 use gpui_component::slider::{Slider, SliderEvent, SliderState};
-use libmpv2::events::Event;
-use libmpv2::Mpv;
+use crate::services::mpv_ipc::{MpvEvent, MpvIpcClient};
 use std::sync::{Arc, Mutex};
 
 use crate::views::icons::{IconCache, IconName};
@@ -287,7 +286,7 @@ const QUALITIES: &[(&str, &str)] = &[
 pub struct PlayerView {
     pub title: String,
     pub published_at: Option<String>,
-    mpv: Arc<Mutex<Mpv>>,
+    mpv: MpvIpcClient,
     current_url: String,
     /// Bare YouTube video ID for "open in browser" link. None when the current
     /// URL is a channel handle (no specific video).
@@ -536,112 +535,90 @@ impl PlayerView {
                 w
             };
 
-            let mpv = Mpv::with_initializer(|init| {
-                init.set_property("wid", child_window as i64)?;
-                init.set_property("ytdl", "yes")?;
-                init.set_property("ytdl-format", QUALITIES[0].1)?; // default = Auto
-                init.set_property("osc", "no")?;
-                init.set_property("input-default-bindings", "no")?;
-                init.set_property("input-vo-keyboard", "no")?;
-                init.set_property("cursor-autohide", "no")?;
-                init.set_property("force-window", "yes")?;
-                init.set_property("idle", "yes")?;
-                init.set_property("keep-open", "no")?;
-                init.set_property("hwdec", "auto-safe")?;
-                init.set_property("volume", 100i64)?;
-                // Gap-free transitions: when the next playlist entry is queued
-                // via `loadfile <url> append-play`, mpv silently runs yt-dlp +
-                // opens the demuxer + prebuffers, so EOF → next is instant.
-                init.set_property("prefetch-playlist", "yes")?;
-                init.set_property("cache", "yes")?;
-                // Cache sizing trades memory/threads vs. blip-resistance.
-                // libmpv's HLS/DASH demuxer keeps one in-flight segment
-                // thread per ~few seconds of readahead; cache-secs=60 +
-                // readahead=20 used to translate to ~80 demux threads
-                // per mpv instance (main + backup = ~160 at idle). 30 s
-                // of readahead still survives a 30 s network blip on a
-                // single video and halves the thread footprint.
-                init.set_property("cache-secs", 30i64)?;
-                init.set_property("demuxer-readahead-secs", 15i64)?;
-                init.set_property("demuxer-max-bytes", "200MiB")?;
-                init.set_property("demuxer-max-back-bytes", "50MiB")?;
-                init.set_property(
-                    "stream-lavf-o",
-                    "reconnect=1,reconnect_streamed=1,reconnect_delay_max=5",
-                )?;
-                // Don't pause to wait for cache to fill before playing —
-                // start as soon as we have enough to decode one frame.
-                // Cuts ~500 ms off perceived startup latency.
-                init.set_property("cache-pause-initial", "no")?;
-                init.set_property("cache-pause-wait", 1.0)?;
-                // Keyframe-only seek on swap = no decoder flush + no
-                // black flash. Slight position imprecision is masked by
-                // our drift-aware logic in swap-up/down.
-                init.set_property("hr-seek", "no")?;
-                init.set_property("network-timeout", 10i64)?;
-                // gpu-next supports the VRR/swap-chain hacks that shave
-                // ~1 vsync of latency. Safe for VOD content.
-                init.set_property("video-latency-hacks", "yes")?;
+            // Phase 3 of the external-mpv refactor: main is now also a
+            // subprocess controlled via JSON IPC. All init options move
+            // from `Mpv::with_initializer` callbacks to CLI flags (same
+            // semantics, one source of truth inspectable with `ps auxf`).
+            let _ = bundled_shader_paths;
+            let wid_flag = format!("--wid={}", child_window);
+            let ytdl_format_flag = format!("--ytdl-format={}", QUALITIES[0].1);
+            let ytdl_path = crate::services::ytdlp_updater::binary_path();
+            let script_opts_flag = if ytdl_path.exists() {
+                Some(format!(
+                    "--script-opts=ytdl_hook-ytdl_path={}",
+                    ytdl_path.display()
+                ))
+            } else {
+                None
+            };
+            let mut flags: Vec<&str> = vec![
+                &wid_flag,
+                "--ytdl=yes",
+                &ytdl_format_flag,
+                "--osc=no",
+                "--input-vo-keyboard=no",
+                "--cursor-autohide=no",
+                "--force-window=yes",
+                "--keep-open=no",
+                "--hwdec=auto-safe",
+                "--volume=100",
+                // Gap-free transitions: `loadfile <next> append-play`
+                // pre-demuxes the next video silently so EOF → next is
+                // instant.
+                "--prefetch-playlist=yes",
+                "--cache=yes",
+                // Cache sizing: trades memory / threads vs. blip
+                // resistance. 30 s readahead survives a 30 s blip on
+                // a single video and keeps demux thread count in check.
+                "--cache-secs=30",
+                "--demuxer-readahead-secs=15",
+                "--demuxer-max-bytes=200MiB",
+                "--demuxer-max-back-bytes=50MiB",
+                "--stream-lavf-o=reconnect=1,reconnect_streamed=1,reconnect_delay_max=5",
+                // Start as soon as one frame is decodable; don't pause
+                // to fill the full cache. -500 ms perceived startup.
+                "--cache-pause-initial=no",
+                "--cache-pause-wait=1.0",
+                // Keyframe-only seek on swap: no decoder flush, no
+                // black flash. The drift-aware swap logic masks the
+                // small position imprecision.
+                "--hr-seek=no",
+                "--network-timeout=10",
+                // gpu-next VRR/swap-chain hacks shave ~1 vsync latency.
+                "--video-latency-hacks=yes",
 
-                // ── "Browser-like" rendering ──────────────────────────────
-                // Goal: match Chrome's <video> output as closely as possible
-                // for YouTube content (no extra sharpening, no tone mapping,
-                // no gamut clipping, no frame interpolation). YouTube already
-                // bakes its own softness into the VP9/AV1 re-encode — adding
-                // mpv post-processing makes the image diverge from what users
-                // expect. "Decode and display, add nothing."
-                init.set_property("vo", "gpu-next")?;
-                init.set_property("profile", "fast")?;
-
-                // Bilinear is what the browser does on the GPU compositor.
-                init.set_property("scale", "bilinear")?;
-                init.set_property("dscale", "bilinear")?;
-                init.set_property("cscale", "bilinear")?;
-                init.set_property("sigmoid-upscaling", "no")?;
-                init.set_property("correct-downscaling", "no")?;
-                init.set_property("linear-downscaling", "no")?;
-                init.set_property("deband", "no")?;
-                init.set_property("dither-depth", "auto")?;
-
-                // Color: let the source/display speak for themselves.
-                // Chrome does no tone/gamut mapping on Linux without an ICC
-                // profile — neither should we.
-                init.set_property("target-colorspace-hint", "no")?;
-                init.set_property("tone-mapping", "auto")?;
-                init.set_property("gamut-mapping-mode", "auto")?;
-
-                // Motion: native cadence, no interpolation (no soap-opera).
-                init.set_property("video-sync", "audio")?;
-                init.set_property("interpolation", "no")?;
-
-                // Anime4K shader stays bundled but un-loaded by default.
-                let _ = bundled_shader_paths;
-                init.set_property("sub-visibility", false)?;
-                init.set_property("sub-auto", "all")?;
-                // YouTube exposes auto-translations to ~200 languages. Asking
-                // for `all` triggers yt-dlp to push them all as subtitle tracks
-                // into mpv (slow + noisy). We pass a SINGLE wildcard token (no
-                // comma — mpv's ytdl-raw-options parser splits values on
-                // commas). Then we further filter the list at display time
-                // (see `list_sub_tracks`).
-                init.set_property(
-                    "ytdl-raw-options",
-                    "sub-langs=all,write-auto-subs=,write-subs=",
-                )?;
-                // Point mpv's bundled ytdl_hook.lua at our auto-updated binary
-                // (see services::ytdlp_updater). Falls back to $PATH resolution
-                // if the file isn't there yet on first boot.
-                let ytdl_path = crate::services::ytdlp_updater::binary_path();
-                if ytdl_path.exists() {
-                    init.set_property(
-                        "script-opts",
-                        format!("ytdl_hook-ytdl_path={}", ytdl_path.display())
-                            .as_str(),
-                    )?;
-                }
-                Ok(())
-            })
-            .expect("Failed to init mpv");
+                // ── "Browser-like" rendering ──────────────────────────
+                // Match Chrome's <video>: no sharpening, no tone mapping,
+                // no gamut clipping, no frame interpolation. "Decode
+                // and display, add nothing."
+                "--vo=gpu-next",
+                "--profile=fast",
+                "--scale=bilinear",
+                "--dscale=bilinear",
+                "--cscale=bilinear",
+                "--sigmoid-upscaling=no",
+                "--correct-downscaling=no",
+                "--linear-downscaling=no",
+                "--deband=no",
+                "--dither-depth=auto",
+                "--target-colorspace-hint=no",
+                "--tone-mapping=auto",
+                "--gamut-mapping-mode=auto",
+                "--video-sync=audio",
+                "--interpolation=no",
+                "--sub-visibility=no",
+                "--sub-auto=all",
+                // YouTube exposes ~200 auto-translated subtitle tracks;
+                // grab them all via the hook, filter at display time
+                // (see `list_sub_tracks`). Commas are the value
+                // separator for mpv's ytdl-raw-options — we pass a
+                // single wildcard token.
+                "--ytdl-raw-options=sub-langs=all,write-auto-subs=,write-subs=",
+            ];
+            if let Some(ref s) = script_opts_flag {
+                flags.push(s);
+            }
+            let mpv = MpvIpcClient::spawn(&flags).expect("Failed to spawn mpv subprocess");
 
             // No `loadfile` at startup — server is the source of truth.
             // `force-window=yes` (set in init) gives us an empty mpv window
@@ -671,7 +648,7 @@ impl PlayerView {
                 ChannelBadge::new(parent_wid, xlib.clone(), display);
 
             (
-                Arc::new(Mutex::new(mpv)),
+                mpv,
                 child_window,
                 xlib,
                 display,
@@ -686,15 +663,13 @@ impl PlayerView {
 
         #[cfg(not(target_os = "linux"))]
         let mpv = {
-            let mpv = Mpv::with_initializer(|init| {
-                init.set_property("ytdl", "yes")?;
-                init.set_property("osc", "no")?;
-                Ok(())
-            })
-            .expect("Failed to init mpv");
-            // Same reason: don't auto-play anything. Wait for tv:state.
+            // Windows/mac path: mpv launches as a subprocess in its own
+            // OS window (no --wid embedding yet — see Phase 2 of the
+            // cross-platform plan in CLAUDE.md). Same IPC control
+            // surface as Linux.
             let _ = initial_video;
-            Arc::new(Mutex::new(mpv))
+            MpvIpcClient::spawn(&["--ytdl=yes", "--osc=no"])
+                .expect("Failed to spawn mpv subprocess")
         };
 
         cx.new(|cx| {
@@ -734,18 +709,12 @@ impl PlayerView {
                                     // swap-up only fires when main can
                                     // actually paint.
                                     let mut just_became_ready = false;
-                                    if let Ok(mut mpv) = p.mpv.lock() {
-                                        loop {
-                                            match mpv.wait_event(0.0) {
-                                                Some(Ok(Event::VideoReconfig)) => {
-                                                    if !p.main_first_frame_ready {
-                                                        just_became_ready = true;
-                                                    }
-                                                    p.main_first_frame_ready = true;
-                                                }
-                                                Some(_) => continue,
-                                                None => break,
+                                    while let Some(ev) = p.mpv.wait_event(0.0) {
+                                        if matches!(ev, MpvEvent::VideoReconfig) {
+                                            if !p.main_first_frame_ready {
+                                                just_became_ready = true;
                                             }
+                                            p.main_first_frame_ready = true;
                                         }
                                     }
                                     // First-frame fade-in: when main mpv
@@ -756,9 +725,7 @@ impl PlayerView {
                                     // the audible burst when video
                                     // suddenly appears.
                                     if just_became_ready && !p.using_backup {
-                                        if let Ok(m) = p.mpv.lock() {
-                                            let _ = m.set_property("mute", false);
-                                        }
+                                        let _ = p.mpv.set_property("mute", false);
                                         fade_volume(p.mpv.clone(), 0, 100, 200, cx);
                                     }
 
@@ -793,9 +760,7 @@ impl PlayerView {
                                     // next playlist entry by watching `path`.
                                     let current_mpv_path = p
                                         .mpv
-                                        .lock()
-                                        .ok()
-                                        .and_then(|m| m.get_property::<String>("path").ok())
+                                        .get_property::<String>("path")
                                         .unwrap_or_default();
                                     let observed = extract_video_id(&current_mpv_path);
 
@@ -817,24 +782,24 @@ impl PlayerView {
 
                                         let main_ok = !current_mpv_path.is_empty()
                                             && current_mpv_path != pre_main
-                                            && p.mpv.lock().ok().map(|m| {
+                                            && {
                                                 // "Actively rendering" =
                                                 // not idle, not buffering,
                                                 // not seeking. time-pos is
                                                 // unreliable: it jumps to
                                                 // `start` instantly on
                                                 // loadfile.
-                                                let core_idle = m
+                                                let core_idle = p.mpv
                                                     .get_property::<bool>("core-idle")
                                                     .unwrap_or(true);
-                                                let stalled = m
+                                                let stalled = p.mpv
                                                     .get_property::<bool>("paused-for-cache")
                                                     .unwrap_or(false);
-                                                let seeking = m
+                                                let seeking = p.mpv
                                                     .get_property::<bool>("seeking")
                                                     .unwrap_or(false);
                                                 !core_idle && !stalled && !seeking
-                                            }).unwrap_or(false);
+                                            };
 
                                         let backup_ok = p.backup.as_ref().map(|b| {
                                             b.is_playing_different_from(&pre_backup)
@@ -884,11 +849,7 @@ impl PlayerView {
                                     if p.backup.is_some() {
                                         let stalled = p
                                             .mpv
-                                            .lock()
-                                            .ok()
-                                            .and_then(|m| {
-                                                m.get_property::<bool>("paused-for-cache").ok()
-                                            })
+                                            .get_property::<bool>("paused-for-cache")
                                             .unwrap_or(false);
                                         let now = std::time::Instant::now();
 
@@ -902,11 +863,7 @@ impl PlayerView {
                                                 {
                                                     let main_pos = p
                                                         .mpv
-                                                        .lock()
-                                                        .ok()
-                                                        .and_then(|m| {
-                                                            m.get_property::<f64>("time-pos").ok()
-                                                        })
+                                                        .get_property::<f64>("time-pos")
                                                         .unwrap_or(0.0);
                                                     let backup_pos = p
                                                         .backup
@@ -931,7 +888,7 @@ impl PlayerView {
                                                     // hard mute toggle.
                                                     fade_volume(p.mpv.clone(), 100, 0, 80, cx);
                                                     if let Some(b) = p.backup.as_ref() {
-                                                        fade_volume_ipc(b.mpv.clone(), 0, 100, 80, cx);
+                                                        fade_volume(b.mpv.clone(), 0, 100, 80, cx);
                                                     }
                                                     p.using_backup = true;
                                                     p.cache_stall_since = None;
@@ -975,9 +932,7 @@ impl PlayerView {
                                                     .unwrap_or(0.0);
                                                 let main_pos_now = p
                                                     .mpv
-                                                    .lock()
-                                                    .ok()
-                                                    .and_then(|m| m.get_property::<f64>("time-pos").ok())
+                                                    .get_property::<f64>("time-pos")
                                                     .unwrap_or(0.0);
                                                 let drift = (backup_pos - main_pos_now).abs();
                                                 // Drift-aware seek: only realign
@@ -987,21 +942,19 @@ impl PlayerView {
                                                 // induced black flash is worse
                                                 // than the imperceptible audio
                                                 // drift.
-                                                if let Ok(m) = p.mpv.lock() {
-                                                    // Unmute main BEFORE the fade
-                                                    // — the fade only ramps volume,
-                                                    // mute=true would keep us silent.
-                                                    let _ = m.set_property("mute", false);
-                                                    if drift > 0.3 && backup_pos > 0.5 {
-                                                        let _ = m.set_property(
-                                                            "time-pos",
-                                                            backup_pos,
-                                                        );
-                                                    }
+                                                // Unmute main BEFORE the fade —
+                                                // the fade only ramps volume,
+                                                // mute=true would keep us silent.
+                                                let _ = p.mpv.set_property("mute", false);
+                                                if drift > 0.3 && backup_pos > 0.5 {
+                                                    let _ = p.mpv.set_property(
+                                                        "time-pos",
+                                                        backup_pos,
+                                                    );
                                                 }
                                                 // Audio crossfade 120ms.
                                                 if let Some(b) = p.backup.as_ref() {
-                                                    fade_volume_ipc(b.mpv.clone(), 100, 0, 120, cx);
+                                                    fade_volume(b.mpv.clone(), 100, 0, 120, cx);
                                                 }
                                                 fade_volume(p.mpv.clone(), 0, 100, 120, cx);
                                                 // Move backup off-screen instead
@@ -1136,9 +1089,7 @@ impl PlayerView {
                     let SliderEvent::Change(v) = ev;
                     let val = v.start().round().clamp(0.0, 100.0) as i64;
                     this.volume = val;
-                    if let Ok(mpv) = mpv_for_vol.lock() {
-                        let _ = mpv.set_property("volume", val);
-                    }
+                    let _ = mpv_for_vol.set_property("volume", val);
                 },
             );
 
@@ -1211,7 +1162,8 @@ impl PlayerView {
 
     #[allow(dead_code)]
     pub fn seek(&self, seconds: f64) {
-        if let Ok(mpv) = self.mpv.lock() {
+        {
+            let mpv = &self.mpv;
             let _ = mpv.set_property("time-pos", seconds);
         }
     }
@@ -1354,7 +1306,8 @@ impl PlayerView {
                 self.loading_until = Some(now + std::time::Duration::from_secs(10));
                 self.loading_for_video = Some(state.video_id.clone());
                 if self.loading_pre_path.is_none() {
-                    if let Ok(mpv) = self.mpv.lock() {
+                    {
+            let mpv = &self.mpv;
                         self.loading_pre_path = mpv.get_property::<String>("path").ok();
                     }
                 }
@@ -1394,7 +1347,8 @@ impl PlayerView {
             // Main loads IN PARALLEL with backup. The existing swap-up
             // logic will reveal main once it's ready (VIDEO_RECONFIG +
             // 3 s on backup).
-            if let Ok(mut mpv) = self.mpv.lock() {
+            {
+            let mpv = &self.mpv;
                 let cur_path = mpv
                     .get_property::<String>("path")
                     .unwrap_or_default();
@@ -1435,7 +1389,8 @@ impl PlayerView {
                 && self.current_video_id.as_deref() != Some(next_id.as_str())
             {
                 let next_url = format!("https://www.youtube.com/watch?v={}", next_id);
-                if let Ok(mpv) = self.mpv.lock() {
+                {
+            let mpv = &self.mpv;
                     // Trim any stale queue entries so the playlist stays at
                     // length 2 (current + prefetched). Re-query each loop
                     // iteration so the condition actually changes.
@@ -1606,7 +1561,8 @@ impl PlayerView {
         // resolved googlevideo URL) before clearing the loading overlay.
         // Both are tracked separately because backup uses a different
         // format selector, so its URL never matches main's.
-        if let Ok(mpv) = self.mpv.lock() {
+        {
+            let mpv = &self.mpv;
             self.loading_pre_path = mpv.get_property::<String>("path").ok();
         }
         self.loading_pre_path_backup = self
@@ -1629,7 +1585,8 @@ impl PlayerView {
     /// for what should play, so we play nothing.
     #[cfg(target_os = "linux")]
     pub fn stop_playback(&mut self) {
-        if let Ok(mpv) = self.mpv.lock() {
+        {
+            let mpv = &self.mpv;
             let _ = mpv.command("stop", &[]);
             let _ = mpv.set_property("pause", true);
             let _ = mpv.set_property("mute", true);
@@ -1666,7 +1623,8 @@ impl PlayerView {
     }
 
     pub fn force_play(&self) {
-        if let Ok(mpv) = self.mpv.lock() {
+        {
+            let mpv = &self.mpv;
             let _ = mpv.set_property("pause", false);
             let _ = mpv.command("seek", &["0", "relative"]);
         }
@@ -1684,9 +1642,7 @@ impl PlayerView {
     }
 
     fn list_all_sub_tracks_filtered(&self, common_only: bool) -> Vec<(i64, String)> {
-        let Ok(mpv) = self.mpv.lock() else {
-            return Vec::new();
-        };
+        let mpv = &self.mpv;
         let count = mpv.get_property::<i64>("track-list/count").unwrap_or(0);
         let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
         let mut tracks = Vec::new();
@@ -1725,9 +1681,7 @@ impl PlayerView {
 
     /// Enumerate audio tracks from mpv's track-list.
     fn list_audio_tracks(&self) -> Vec<(i64, String)> {
-        let Ok(mpv) = self.mpv.lock() else {
-            return Vec::new();
-        };
+        let mpv = &self.mpv;
         let count = mpv.get_property::<i64>("track-list/count").unwrap_or(0);
         let mut tracks = Vec::new();
         for i in 0..count {
@@ -1770,9 +1724,7 @@ impl PlayerView {
         // Save current playback position so we can resume there.
         let saved_pos = self
             .mpv
-            .lock()
-            .ok()
-            .and_then(|m| m.get_property::<f64>("time-pos").ok())
+            .get_property::<f64>("time-pos")
             .unwrap_or(0.0);
 
         // Step 1 — bring the (already-decoded, already-running) backup
@@ -1792,7 +1744,8 @@ impl PlayerView {
         // Step 2 — reload the main with the new ytdl-format. This stalls
         // the main mpv for a few seconds while it re-resolves and buffers,
         // but the user is now watching the backup so doesn't notice.
-        if let Ok(mpv) = self.mpv.lock() {
+        {
+            let mpv = &self.mpv;
             let _ = mpv.set_property("ytdl-format", fmt);
             let _ = mpv.set_property("mute", true); // backup carries the audio
             if saved_pos > 0.5 {
@@ -1807,7 +1760,8 @@ impl PlayerView {
 
     /// Set a specific subtitle track by id (None = off).
     pub fn set_sub_track(&mut self, id: Option<i64>) {
-        if let Ok(mpv) = self.mpv.lock() {
+        {
+            let mpv = &self.mpv;
             match id {
                 Some(sid) => {
                     let _ = mpv.set_property("sid", sid);
@@ -1894,11 +1848,7 @@ impl PlayerView {
             MenuKind::Captions => {
                 let mut items = vec!["Off".to_string()];
                 let tracks = self.list_sub_tracks();
-                let current_sid = self
-                    .mpv
-                    .lock()
-                    .ok()
-                    .and_then(|m| m.get_property::<i64>("sid").ok());
+                let current_sid = self.mpv.get_property::<i64>("sid").ok();
                 let mut selected = if self.captions_on { None } else { Some(0) };
                 for (i, (id, label)) in tracks.iter().enumerate() {
                     items.push(label.clone());
@@ -1920,11 +1870,7 @@ impl PlayerView {
             }
             MenuKind::Audio => {
                 let tracks = self.list_audio_tracks();
-                let current_aid = self
-                    .mpv
-                    .lock()
-                    .ok()
-                    .and_then(|m| m.get_property::<i64>("aid").ok());
+                let current_aid = self.mpv.get_property::<i64>("aid").ok();
                 let items: Vec<String> = if tracks.is_empty() {
                     vec!["(aucune piste)".to_string()]
                 } else {
@@ -1944,7 +1890,8 @@ impl PlayerView {
     }
 
     pub fn set_audio_track(&mut self, id: i64) {
-        if let Ok(mpv) = self.mpv.lock() {
+        {
+            let mpv = &self.mpv;
             let _ = mpv.set_property("aid", id);
         }
         self.audio_label = self
@@ -1980,7 +1927,8 @@ impl PlayerView {
                 b.set_geometry(x, y, width, height);
             }
             if size_changed {
-                if let Ok(mpv) = self.mpv.lock() {
+                {
+            let mpv = &self.mpv;
                     if let Ok(pos) = mpv.get_property::<f64>("time-pos") {
                         // Seek to current pos = full A/V resync, no
                         // perceptible position change.
@@ -2151,9 +2099,7 @@ impl Render for PlayerView {
                         cx.listener(|this, _ev: &ClickEvent, window, cx| {
                             let new = if this.volume > 0 { 0 } else { 100 };
                             this.volume = new;
-                            if let Ok(mpv) = this.mpv.lock() {
-                                let _ = mpv.set_property("volume", new);
-                            }
+                            let _ = this.mpv.set_property("volume", new);
                             this.volume_state.update(cx, |s, cx| {
                                 s.set_value(new as f32, window, cx);
                             });
@@ -2283,46 +2229,10 @@ impl Render for PlayerView {
 /// Linear volume ramp over `total_ms` on a shared mpv handle.
 /// Replaces the audible-pop `set("mute", true)` toggle on swap with a
 /// short crossfade. Spawned on GPUI's executor so it doesn't block the
-/// poll loop. Steps every 16 ms (~60 Hz vsync) to stay smooth.
+/// poll loop. Steps every 16 ms (~60 Hz vsync) to stay smooth. Post-
+/// Phase-3: both main and backup are IPC-controlled so this is the
+/// only variant — no more libmpv2.
 fn fade_volume<T: 'static>(
-    mpv: std::sync::Arc<std::sync::Mutex<libmpv2::Mpv>>,
-    from: i64,
-    to: i64,
-    total_ms: u64,
-    cx: &mut Context<T>,
-) {
-    let start = std::time::Instant::now();
-    let total = std::time::Duration::from_millis(total_ms);
-    cx.spawn(async move |_, cx| {
-        let from_f = from as f64;
-        let to_f = to as f64;
-        loop {
-            let elapsed = start.elapsed();
-            if elapsed >= total {
-                if let Ok(m) = mpv.lock() {
-                    let _ = m.set_property("volume", to);
-                }
-                break;
-            }
-            let t = elapsed.as_millis() as f64 / total_ms.max(1) as f64;
-            let v = (from_f + (to_f - from_f) * t).round() as i64;
-            if let Ok(m) = mpv.lock() {
-                let _ = m.set_property("volume", v);
-            }
-            cx.background_executor()
-                .timer(std::time::Duration::from_millis(16))
-                .await;
-        }
-    })
-    .detach();
-}
-
-/// Same as `fade_volume` but for the external-IPC backup player.
-/// Split overload instead of a trait generic because during Phase 2
-/// the main still uses `libmpv2::Mpv` while the backup is already
-/// `MpvIpcClient` — the signatures don't unify cleanly until Phase 3
-/// retires the main's `Arc<Mutex<Mpv>>` too.
-fn fade_volume_ipc<T: 'static>(
     mpv: crate::services::mpv_ipc::MpvIpcClient,
     from: i64,
     to: i64,
