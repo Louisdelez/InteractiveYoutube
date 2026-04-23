@@ -44,9 +44,11 @@ unsafe extern "C" fn x11_error_handler(
     // Runtime errors: log once and continue (never exit). BadWindow on
     // a stale resource is recoverable — the default handler aborting
     // the whole process is worse than a warning.
-    eprintln!(
-        "X11 error: code={} request={} resource=0x{:x}",
-        ev.error_code, ev.request_code, ev.resourceid
+    tracing::warn!(
+        code = ev.error_code,
+        request = ev.request_code,
+        resource = format!("0x{:x}", ev.resourceid),
+        "X11 error"
     );
     0
 }
@@ -530,10 +532,17 @@ impl PlayerView {
                 // opens the demuxer + prebuffers, so EOF → next is instant.
                 init.set_property("prefetch-playlist", "yes")?;
                 init.set_property("cache", "yes")?;
-                // Generous cache so transient network blips don't stall.
-                init.set_property("cache-secs", 60i64)?;
-                init.set_property("demuxer-readahead-secs", 20i64)?;
+                // Cache sizing trades memory/threads vs. blip-resistance.
+                // libmpv's HLS/DASH demuxer keeps one in-flight segment
+                // thread per ~few seconds of readahead; cache-secs=60 +
+                // readahead=20 used to translate to ~80 demux threads
+                // per mpv instance (main + backup = ~160 at idle). 30 s
+                // of readahead still survives a 30 s network blip on a
+                // single video and halves the thread footprint.
+                init.set_property("cache-secs", 30i64)?;
+                init.set_property("demuxer-readahead-secs", 15i64)?;
                 init.set_property("demuxer-max-bytes", "200MiB")?;
+                init.set_property("demuxer-max-back-bytes", "50MiB")?;
                 init.set_property(
                     "stream-lavf-o",
                     "reconnect=1,reconnect_streamed=1,reconnect_delay_max=5",
@@ -1063,13 +1072,18 @@ impl PlayerView {
                                     }
                                     // Record whether we're in a critical
                                     // phase, so the outer loop can pick
-                                    // the tight 16 ms interval.
+                                    // the tight 16 ms interval. `!main_first_frame_ready`
+                                    // used to be a standalone term and pinned
+                                    // the loop at 16 ms forever when nothing
+                                    // was playing (startup, between switches).
+                                    // The other flags already cover every "we
+                                    // need to catch the next VIDEO_RECONFIG"
+                                    // case, so idle can safely tick at 60 ms.
                                     let is_critical = p.loading_for_video.is_some()
                                         || p.cache_stall_since.is_some()
                                         || p.switch_arm_at.is_some()
                                         || p.pending_main_load.is_some()
-                                        || p.pending_backup_reveal
-                                        || !p.main_first_frame_ready;
+                                        || p.pending_backup_reveal;
                                     crit.store(is_critical, std::sync::atomic::Ordering::Relaxed);
                                 });
                             }

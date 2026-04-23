@@ -35,6 +35,15 @@ pub struct AppView {
     /// Raw avatar bytes per channel id, kept around so the player's
     /// "now playing" badge can blit them without re-fetching.
     avatar_bytes: std::collections::HashMap<String, Vec<u8>>,
+    /// Last accepted tv:state per channel_id. Used for the optimistic
+    /// instant-zap: when the user clicks a channel they've recently
+    /// visited, we synthesise a rebased TvState from this cache
+    /// (seek_to advanced by elapsed wall-clock) and call `load_state`
+    /// synchronously — the cached backup mpv is revealed *before* the
+    /// server round-trip completes. The real tv:state arriving ~50-
+    /// 200 ms later re-enters load_state idempotently and applies any
+    /// drift correction.
+    last_state_per_channel: std::collections::HashMap<String, crate::models::tv_state::TvState>,
     /// Connection status — derived from `latency_ms`. Kept for the player
     /// overlay logic ("server unavailable" curtain).
     connected: bool,
@@ -43,9 +52,6 @@ pub struct AppView {
     /// Round-trip latency to the server's `/health` endpoint, in milliseconds.
     /// `None` means the last probe failed → server is considered offline.
     latency_ms: Option<u32>,
-    /// Timestamps of recent render() calls — used to compute an approximate
-    /// FPS counter in the topbar. Rolling 1-second window.
-    frame_times: Rc<RefCell<std::collections::VecDeque<std::time::Instant>>>,
     /// Logged-in user (None = anonymous).
     user: Option<User>,
     /// Auth panel visible (replaces the chat panel) when set.
@@ -138,6 +144,44 @@ impl AppView {
                         c.replace_messages(Vec::new(), cx);
                         cx.notify();
                     });
+                    // Optimistic instant switch: if we have a recent
+                    // tv:state cached for the target channel, rebase
+                    // seek_to by elapsed wall-clock and call load_state
+                    // synchronously — the backup mpv for this channel
+                    // (if present in memory_cache) is revealed *now*,
+                    // before the socket.io round-trip completes. The
+                    // real server state, arriving ~50-200 ms later,
+                    // re-enters load_state idempotently: same video_id
+                    // skips the main loadfile, drift correction (4 s
+                    // threshold) absorbs any mismatch from our local
+                    // rebase. Cold channels (no cached state) fall back
+                    // to the normal server-driven path.
+                    if let Some(cached) = this
+                        .last_state_per_channel
+                        .get(&event.channel_id)
+                        .cloned()
+                    {
+                        let now_secs = std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .map(|d| d.as_secs())
+                            .unwrap_or(cached.server_time);
+                        let elapsed = now_secs.saturating_sub(cached.server_time) as f64;
+                        let rebased_seek = cached.seek_to + elapsed;
+                        // If the cached video would already have ended,
+                        // don't rebase — use the cached state as-is and
+                        // let the server tell us the new video. The
+                        // backup mpv (paused on the old frame) is still
+                        // revealed for a visible instant response.
+                        let rebased = if rebased_seek < cached.duration {
+                            crate::models::tv_state::TvState {
+                                seek_to: rebased_seek,
+                                ..cached
+                            }
+                        } else {
+                            cached
+                        };
+                        this.player.update(cx, |p, cx| p.load_state(&rebased, cx));
+                    }
                     let _ = cmd_tx_clone.send(ClientCommand::SwitchChannel(event.channel_id.clone()));
                     // Ask the server for the new channel's chat history.
                     let _ = cmd_tx_clone.send(ClientCommand::ChatChannelChanged(event.channel_id.clone()));
@@ -391,6 +435,74 @@ impl AppView {
             })
             .detach();
 
+            // Prefetch tv:state for every channel so the very first click
+            // on a channel that was never visited also hits the optimistic
+            // instant-zap path (the click handler synthesises a rebased
+            // state from `last_state_per_channel` and calls load_state
+            // synchronously before the socket round-trip completes). We
+            // fire one HTTP request per channel in parallel — the server
+            // handles each with a single playlist lookup, total ~100 ms
+            // for 48 chaînes. Cost: ~60 kB of JSON; benefit: every click
+            // henceforth is instant regardless of visit history.
+            let sidebar_prefetch = sidebar.clone();
+            let entity_for_prefetch = cx.entity().downgrade();
+            cx.spawn(async move |_, cx| {
+                // Wait for the channel list to populate (avatar spawn
+                // polls it too via its own retry; 5 s is the same budget).
+                let mut channel_ids: Vec<String> = Vec::new();
+                for _ in 0..50 {
+                    let got: Vec<String> = cx.update(|cx| {
+                        sidebar_prefetch
+                            .read(cx)
+                            .channels
+                            .iter()
+                            .map(|c| c.id.clone())
+                            .collect::<Vec<_>>()
+                    });
+                    if !got.is_empty() {
+                        channel_ids = got;
+                        break;
+                    }
+                    cx.background_executor().timer(Duration::from_millis(100)).await;
+                }
+                if channel_ids.is_empty() {
+                    return;
+                }
+                let (tx, rx) = std::sync::mpsc::channel::<(
+                    String,
+                    crate::models::tv_state::TvState,
+                )>();
+                for id in channel_ids {
+                    let tx = tx.clone();
+                    std::thread::spawn(move || {
+                        if let Ok(state) = api::fetch_tv_state(&id) {
+                            let _ = tx.send((id, state));
+                        }
+                    });
+                }
+                drop(tx);
+                loop {
+                    match rx.try_recv() {
+                        Ok((id, state)) => {
+                            if let Some(this) = entity_for_prefetch.upgrade() {
+                                let _ = cx.update(|cx| {
+                                    this.update(cx, |app: &mut AppView, _| {
+                                        app.last_state_per_channel.insert(id, state);
+                                    });
+                                });
+                            }
+                        }
+                        Err(std::sync::mpsc::TryRecvError::Empty) => {
+                            cx.background_executor()
+                                .timer(Duration::from_millis(50))
+                                .await;
+                        }
+                        Err(std::sync::mpsc::TryRecvError::Disconnected) => break,
+                    }
+                }
+            })
+            .detach();
+
             // Poll the server-event channel from GPUI's executor and dispatch to views
             let rx = Arc::new(Mutex::new(event_rx));
             let player_poll = player.clone();
@@ -461,6 +573,17 @@ impl AppView {
                                                 }
                                             });
                                         }
+                                        if accept {
+                                            // Remember the latest accepted state
+                                            // per channel for the optimistic
+                                            // instant-zap at click time.
+                                            if let Some(e) = entity_for_status.upgrade() {
+                                                e.update(cx, |this, _cx| {
+                                                    this.last_state_per_channel
+                                                        .insert(state.channel_id.clone(), state.clone());
+                                                });
+                                            }
+                                        }
                                         if !accept {
                                             if let Some(e) = entity_for_status.upgrade() {
                                                 e.update(cx, |this, _cx| {
@@ -528,6 +651,7 @@ impl AppView {
                                         if let Some(e) = entity_for_status.upgrade() {
                                             e.update(cx, |this, cx| {
                                                 this.maintenance = false;
+                                                this.maintenance_warning = false;
                                                 cx.notify();
                                             });
                                         }
@@ -770,11 +894,11 @@ impl AppView {
                 current_channel_id: initial_channel_id,
                 pending_channel_switch: None,
                 avatar_bytes: std::collections::HashMap::new(),
+                last_state_per_channel: std::collections::HashMap::new(),
                 connected: false,
                 maintenance: false,
                 maintenance_warning: false,
                 latency_ms: None,
-                frame_times: Rc::new(RefCell::new(std::collections::VecDeque::with_capacity(128))),
                 user: None,
                 auth: None,
                 chat_open: true,
@@ -1044,30 +1168,7 @@ impl AppView {
 
 impl Render for AppView {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        // Record this frame + prune entries older than 1s.
-        {
-            let now = std::time::Instant::now();
-            let cutoff = now - std::time::Duration::from_secs(1);
-            let mut ft = self.frame_times.borrow_mut();
-            ft.push_back(now);
-            while ft.front().map_or(false, |t| *t < cutoff) {
-                ft.pop_front();
-            }
-        }
-        // Kick another render in ~200ms so the FPS counter keeps ticking
-        // even when the rest of the UI is idle. cheap: pure notify.
-        cx.spawn(async move |this, cx| {
-            cx.background_executor()
-                .timer(std::time::Duration::from_millis(200))
-                .await;
-            if let Some(e) = this.upgrade() {
-                let _ = cx.update_entity(&e, |_, cx| cx.notify());
-            }
-        })
-        .detach();
-
-        let fps = self.frame_times.borrow().len();
-
+        let _ = cx;
         div()
             .flex()
             .flex_col()
@@ -1440,13 +1541,6 @@ impl Render for AppView {
                                         }
                                     })
                             })
-                            // App FPS (render calls / second, rolling 1s)
-                            .child(
-                                div()
-                                    .text_xs()
-                                    .text_color(rgb(0x888888))
-                                    .child(format!("{} fps", fps)),
-                            )
                     })
             )
             .child({

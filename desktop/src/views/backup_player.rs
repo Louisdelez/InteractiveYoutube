@@ -109,7 +109,16 @@ impl BackupPlayer {
                 init.set_property("keep-open", "no")?;
                 init.set_property("hwdec", "auto-safe")?;
                 init.set_property("cache", "yes")?;
-                init.set_property("cache-secs", 30i64)?;
+                // Backup is the *low-quality* preview, loaded in parallel
+                // with main for fast-first-frame. A 10 s readahead is
+                // plenty — main takes over within ~3 s anyway, and a
+                // smaller cache means fewer HLS segment threads (libmpv
+                // spawns one per in-flight segment). Default 30 s used
+                // to translate into ~80 demux threads per backup mpv.
+                init.set_property("cache-secs", 10i64)?;
+                init.set_property("demuxer-readahead-secs", 6i64)?;
+                init.set_property("demuxer-max-bytes", 40 * 1024 * 1024i64)?;
+                init.set_property("demuxer-max-back-bytes", 10 * 1024 * 1024i64)?;
                 init.set_property("vo", "gpu-next")?;
                 // Mute by default.
                 init.set_property("mute", true)?;
@@ -245,16 +254,34 @@ impl BackupPlayer {
         self.visible = false;
         if let Ok(mpv) = self.mpv.lock() {
             let _ = mpv.set_property("mute", true);
+            // Shrink the demuxer while parked. Each cached backup used
+            // to hold the default 30 s readahead + a full HLS segment
+            // thread pool — with a cache capacity of 5 channels that's
+            // where the ~150 "demux" threads seen at runtime came from.
+            // Cutting readahead to 5 s and the byte budget to 20 MiB
+            // releases most of those threads and ~30-60 MB/backup of
+            // RAM. thaw() restores the defaults so live-visible backups
+            // keep the 30 s cushion they need for smooth playback.
+            let _ = mpv.set_property("cache-secs", 5i64);
+            let _ = mpv.set_property("demuxer-readahead-secs", 5i64);
+            let _ = mpv.set_property("demuxer-max-bytes", 20 * 1024 * 1024i64);
+            let _ = mpv.set_property("demuxer-max-back-bytes", 5 * 1024 * 1024i64);
         }
     }
 
-    /// Thaw: unmute (the caller will `show()` to map+raise the X11
-    /// window). The mpv was never paused so this is just an audio
-    /// flip — the next frame mpv produces lands on screen as soon as
-    /// the window is mapped.
+    /// Thaw: unmute + restore the full demuxer cache (freeze shrunk it
+    /// to save RAM / threads while parked). The caller will `show()` to
+    /// map+raise the X11 window. The mpv was never paused so this is
+    /// just an audio flip + buffer re-grow — the next frame mpv produces
+    /// lands on screen as soon as the window is mapped.
     pub fn thaw(&mut self) {
         if let Ok(mpv) = self.mpv.lock() {
             let _ = mpv.set_property("mute", false);
+            // Restore the live defaults (same as BackupPlayer::new).
+            let _ = mpv.set_property("cache-secs", 10i64);
+            let _ = mpv.set_property("demuxer-readahead-secs", 6i64);
+            let _ = mpv.set_property("demuxer-max-bytes", 40 * 1024 * 1024i64);
+            let _ = mpv.set_property("demuxer-max-back-bytes", 10 * 1024 * 1024i64);
         }
     }
 
