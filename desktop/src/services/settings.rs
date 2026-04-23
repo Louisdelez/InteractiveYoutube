@@ -20,6 +20,14 @@ pub struct Settings {
     /// "Favoris" section between Mémoire and TV.
     #[serde(default)]
     pub favorites: Vec<String>,
+    /// Preferred max quality for the main (high-quality) player.
+    /// Index into `QUALITIES` in `views/player.rs`:
+    /// `0=Auto (1080p), 1=1080p, 2=720p, 3=480p, 4=360p`. Lowering
+    /// reduces GPU upload + bandwidth (~5-8 % CPU at 720p vs 1080p).
+    /// Doesn't affect zap latency — the backup low-res stream is
+    /// always 360p and always leads the first frame.
+    #[serde(default)]
+    pub preferred_quality: u8,
 }
 
 fn default_memory_capacity() -> u8 {
@@ -31,6 +39,7 @@ impl Default for Settings {
         Self {
             memory_capacity: 2,
             favorites: Vec::new(),
+            preferred_quality: 0, // Auto = try 1080p, fall back to best available
         }
     }
 }

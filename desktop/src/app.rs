@@ -943,12 +943,17 @@ impl AppView {
             .detach();
 
             // Load persistent user settings, then push them into the
-            // player (memory cache size) and sidebar (favourites).
+            // player (memory cache size + preferred quality) and
+            // sidebar (favourites).
             let initial_settings = settings::load();
             #[cfg(target_os = "linux")]
             player.update(cx, |p, _| {
                 p.set_memory_capacity(initial_settings.memory_capacity);
             });
+            if initial_settings.preferred_quality != 0 {
+                let q = initial_settings.preferred_quality as usize;
+                player.update(cx, |p, cx| p.set_quality(q, cx));
+            }
             sidebar.update(cx, |s, cx| {
                 s.set_favorites(initial_settings.favorites.clone());
                 cx.notify();
@@ -1076,6 +1081,10 @@ fn spawn_pull_user_settings(cx: &mut Context<AppView>) {
                                 this.player.update(cx, |p, _| {
                                     p.set_memory_capacity(s.memory_capacity);
                                 });
+                                if s.preferred_quality != 0 {
+                                    let q = s.preferred_quality as usize;
+                                    this.player.update(cx, |p, cx| p.set_quality(q, cx));
+                                }
                                 let favs = s.favorites.clone();
                                 this.sidebar.update(cx, |s, cx| {
                                     s.set_favorites(favs);
@@ -1151,6 +1160,12 @@ impl AppView {
                     SettingsEvent::PurgeMemory => {
                         #[cfg(target_os = "linux")]
                         player_clone.update(cx, |p, _| p.purge_memory_cache());
+                    }
+                    SettingsEvent::QualityChanged(idx) => {
+                        this.settings.preferred_quality = idx;
+                        settings::save(&this.settings);
+                        spawn_push_user_settings(this.settings.clone());
+                        player_clone.update(cx, |p, cx| p.set_quality(idx as usize, cx));
                     }
                     SettingsEvent::Close => {
                         // Restore mpv before dropping the modal.

@@ -33,6 +33,12 @@ router.put('/settings', requireAuth, async (req, res) => {
   if (Array.isArray(settings.favorites)) {
     safe.favorites = settings.favorites.filter((s) => typeof s === 'string').slice(0, 50);
   }
+  // Preferred quality: index into desktop's QUALITIES array (0=Auto, 1=1080p,
+  // 2=720p, 3=480p, 4=360p). Clamped to valid range; unknown values silently
+  // fall back to 0 so a corrupt client payload doesn't break playback.
+  if (typeof settings.preferred_quality === 'number') {
+    safe.preferred_quality = Math.max(0, Math.min(4, Math.floor(settings.preferred_quality)));
+  }
   try {
     await setUserSettings(req.user.id, safe);
     res.json({ ok: true, settings: safe });

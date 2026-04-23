@@ -19,6 +19,10 @@ pub enum SettingsEvent {
     /// User clicked the "Purger" button. AppView asks PlayerView to
     /// drop all cached channels.
     PurgeMemory,
+    /// User changed the preferred max quality. Index into `QUALITIES`
+    /// (0=Auto, 1=1080p, 2=720p, 3=480p, 4=360p). AppView forwards
+    /// to PlayerView::set_quality and persists.
+    QualityChanged(u8),
     /// User closed the modal.
     Close,
 }
@@ -42,12 +46,20 @@ impl SettingsModal {
 impl Render for SettingsModal {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let cap = self.settings.memory_capacity;
+        let quality = self.settings.preferred_quality;
         let options: [(u8, &'static str); 5] = [
             (0, "Off"),
             (2, "2"),
             (3, "3"),
             (4, "4"),
             (5, "5"),
+        ];
+        let quality_options: [(u8, &'static str); 5] = [
+            (0, "Auto"),
+            (1, "1080p"),
+            (2, "720p"),
+            (3, "480p"),
+            (4, "360p"),
         ];
 
         div()
@@ -173,6 +185,70 @@ impl Render for SettingsModal {
                                 cx.emit(SettingsEvent::PurgeMemory);
                             })),
                     ),
+            )
+            // Quality section
+            .child(
+                div()
+                    .flex()
+                    .flex_col()
+                    .gap_2()
+                    .child(
+                        div()
+                            .text_xs()
+                            .font_weight(FontWeight::SEMIBOLD)
+                            .text_color(rgb(0xefeff1))
+                            .child("Qualité vidéo"),
+                    )
+                    .child(
+                        div()
+                            .text_xs()
+                            .text_color(rgb(0x9b9b9e))
+                            .child(
+                                "Qualité maximale du flux haute résolution. \
+                                 N'affecte pas la vitesse de zap (le flux 360p rapide mène toujours)."
+                            ),
+                    )
+                    .child(
+                        div()
+                            .flex()
+                            .gap_2()
+                            .mt_1()
+                            .children(quality_options.iter().map(|(value, label)| {
+                                let is_selected = *value == quality;
+                                let v = *value;
+                                div()
+                                    .id(("quality", v as usize))
+                                    .px_3()
+                                    .py_1()
+                                    .rounded(px(4.0))
+                                    .cursor_pointer()
+                                    .text_xs()
+                                    .font_weight(FontWeight::SEMIBOLD)
+                                    .bg(if is_selected { rgb(0x9b59b6) } else { rgb(0x26262b) })
+                                    .text_color(if is_selected { rgb(0xffffff) } else { rgb(0xefeff1) })
+                                    .hover(|this| this.bg(rgb(0xb57edc)))
+                                    .child(label.to_string())
+                                    .on_click(cx.listener(move |this, _, _, cx| {
+                                        this.settings.preferred_quality = v;
+                                        cx.emit(SettingsEvent::QualityChanged(v));
+                                        cx.notify();
+                                    }))
+                            }).collect::<Vec<_>>())
+                    )
+                    .child({
+                        let hint = match quality {
+                            0 => "Auto — tente 1080p, redescend si indisponible. Meilleur visuel.",
+                            1 => "1080p — qualité max. ~27 % CPU continu sur GTX 1630.",
+                            2 => "720p — ~5-8 % CPU de moins, qualité encore excellente.",
+                            3 => "480p — léger mais visible sur grand écran.",
+                            4 => "360p — minimal CPU / bande passante. Pour WiFi faible.",
+                            _ => "",
+                        };
+                        div()
+                            .text_xs()
+                            .text_color(rgb(0x6b7280))
+                            .child(hint.to_string())
+                    }),
             )
     }
 }
