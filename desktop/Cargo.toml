@@ -7,7 +7,6 @@ edition = "2021"
 gpui = { git = "https://github.com/zed-industries/zed" }
 gpui_platform = { git = "https://github.com/zed-industries/zed", features = ["font-kit", "x11", "wayland", "runtime_shaders"] }
 gpui-component = { git = "https://github.com/longbridge/gpui-component" }
-libmpv2 = "5.0"
 raw-window-handle = { version = "0.6", features = ["std"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -22,6 +21,9 @@ usvg = { version = "0.44", default-features = false }
 png = "0.17"
 image = { version = "0.25.10", default-features = false, features = ["png", "jpeg"] }
 libc = "0.2"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", default-features = false, features = ["env-filter", "fmt", "registry", "std"] }
+tracing-appender = "0.2"
 
 [target."cfg(target_os = \"linux\")".dependencies]
 x11-dl = "2"
@@ -31,10 +33,10 @@ name = "koala-tv"
 maintainer = "Louis Delez <loicdelez.ch@gmail.com>"
 copyright = "2026, Louis Delez"
 license-file = ["../LICENSE", "0"]
-extended-description = "Koala TV desktop client: synced multi-channel YouTube TV with live chat, built on Rust + GPUI + libmpv. https://github.com/Louisdelez/KoalaTV"
+extended-description = "Koala TV desktop client: synced multi-channel YouTube TV with live chat, built on Rust + GPUI. Spawns mpv as a subprocess (JSON IPC) for video playback — depends on the mpv binary being on PATH. https://github.com/Louisdelez/KoalaTV"
 section = "video"
 priority = "optional"
-depends = "libc6, libmpv2 | libmpv1, libx11-6, libxft2"
+depends = "libc6, mpv, libx11-6, libxft2"
 assets = [
   ["target/release/koala-tv-desktop", "usr/bin/koala-tv", "755"],
   ["assets/koala-tv.png", "usr/share/icons/hicolor/256x256/apps/koala-tv.png", "644"],
