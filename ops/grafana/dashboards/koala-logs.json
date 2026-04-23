@@ -1,0 +1,171 @@
+{
+  "title": "Koala TV — Logs",
+  "uid": "koala-logs",
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": true,
+  "refresh": "10s",
+  "time": { "from": "now-6h", "to": "now" },
+  "timezone": "browser",
+  "tags": ["koala", "logs"],
+  "templating": {
+    "list": [
+      {
+        "name": "source",
+        "label": "Source",
+        "type": "query",
+        "datasource": { "type": "loki", "uid": "loki-default" },
+        "query": "label_values({job=\"koala\"}, source)",
+        "includeAll": true,
+        "multi": true,
+        "refresh": 2,
+        "current": { "selected": false, "text": ["All"], "value": ["$__all"] }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Log rate by source (lines/s, 1m)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "datasource": { "type": "loki", "uid": "loki-default" },
+      "targets": [
+        {
+          "expr": "sum by (source) (rate({job=\"koala\", source=~\"$source\"}[1m]))",
+          "legendFormat": "{{source}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 10 },
+          "unit": "logs/s"
+        }
+      }
+    },
+    {
+      "id": 2,
+      "title": "Errors (server pino) last 1h",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+      "datasource": { "type": "loki", "uid": "loki-default" },
+      "targets": [
+        {
+          "expr": "sum(count_over_time({job=\"koala\", source=~\"server|server-error\"} | json | level >= 50 [1h]))",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 1 },
+              { "color": "red", "value": 20 }
+            ]
+          }
+        }
+      },
+      "options": { "colorMode": "background", "reduceOptions": { "calcs": ["lastNotNull"] } }
+    },
+    {
+      "id": 3,
+      "title": "Desktop WARN+ERROR last 1h",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+      "datasource": { "type": "loki", "uid": "loki-default" },
+      "targets": [
+        {
+          "expr": "sum(count_over_time({job=\"koala\", source=\"desktop\"} |~ \" (WARN|ERROR)[ ]\" [1h]))",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 1 },
+              { "color": "red", "value": 20 }
+            ]
+          }
+        }
+      },
+      "options": { "colorMode": "background", "reduceOptions": { "calcs": ["lastNotNull"] } }
+    },
+    {
+      "id": 4,
+      "title": "Web-forwarded events last 1h",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 4 },
+      "datasource": { "type": "loki", "uid": "loki-default" },
+      "targets": [
+        {
+          "expr": "sum(count_over_time({job=\"koala\", src_extra=\"web\"} [1h]))",
+          "refId": "A"
+        }
+      ],
+      "options": { "colorMode": "value", "reduceOptions": { "calcs": ["lastNotNull"] } }
+    },
+    {
+      "id": 5,
+      "title": "Desktop-forwarded events last 1h",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 4 },
+      "datasource": { "type": "loki", "uid": "loki-default" },
+      "targets": [
+        {
+          "expr": "sum(count_over_time({job=\"koala\", src_extra=\"desktop\"} [1h]))",
+          "refId": "A"
+        }
+      ],
+      "options": { "colorMode": "value", "reduceOptions": { "calcs": ["lastNotNull"] } }
+    },
+    {
+      "id": 6,
+      "title": "Errors timeline — server level >= 50 (error+fatal)",
+      "type": "timeseries",
+      "gridPos": { "h": 7, "w": 24, "x": 0, "y": 8 },
+      "datasource": { "type": "loki", "uid": "loki-default" },
+      "targets": [
+        {
+          "expr": "sum by (source) (count_over_time({job=\"koala\", source=~\"server|server-error\"} | json | level >= 50 [1m]))",
+          "legendFormat": "{{source}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "drawStyle": "bars", "fillOpacity": 40 },
+          "color": { "mode": "fixed", "fixedColor": "red" }
+        }
+      }
+    },
+    {
+      "id": 7,
+      "title": "Live logs (filtered by $source)",
+      "type": "logs",
+      "gridPos": { "h": 16, "w": 24, "x": 0, "y": 15 },
+      "datasource": { "type": "loki", "uid": "loki-default" },
+      "targets": [
+        {
+          "expr": "{job=\"koala\", source=~\"$source\"}",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "showLabels": false,
+        "showCommonLabels": false,
+        "wrapLogMessage": true,
+        "prettifyLogMessage": true,
+        "enableLogDetails": true,
+        "sortOrder": "Descending",
+        "dedupStrategy": "none"
+      }
+    }
+  ]
+}

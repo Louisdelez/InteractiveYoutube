@@ -1,0 +1,108 @@
+// Koala TV — Alloy log collection.
+//
+// Tails the files produced by:
+//   - server   (pino JSON, with rotation: server.YYYY-MM-DD.N.log)
+//   - server   error sink (server-error.YYYY-MM-DD.N.log)
+//   - cron     (koala-cron.log, plain-text lines)
+//   - desktop  (tracing-appender text format, daily files)
+//
+// Labels kept intentionally small (job/source) to avoid cardinality
+// blowup. Everything else (level, channelId, ip, sessionId, …) stays in
+// the log body and is reachable in LogQL via `| json` for Pino or
+// `| regexp ...` for the desktop text format.
+
+logging {
+  level  = "warn"
+  format = "logfmt"
+}
+
+// ── Globs → concrete files ─────────────────────────────────────────
+//
+// loki.source.file expects literal paths, not globs. local.file_match
+// resolves the glob, polls for new files, and feeds the target list.
+
+local.file_match "server_pino" {
+  path_targets = [
+    { __path__ = "/var/log/koala/server/server.*.log",       job = "koala", source = "server" },
+    { __path__ = "/var/log/koala/server/server-error.*.log", job = "koala", source = "server-error" },
+  ]
+  sync_period = "10s"
+}
+
+local.file_match "server_cron" {
+  path_targets = [
+    { __path__ = "/var/log/koala/server/koala-cron.log", job = "koala", source = "cron" },
+  ]
+  sync_period = "30s"
+}
+
+local.file_match "desktop_tracing" {
+  path_targets = [
+    { __path__ = "/var/log/koala/desktop/desktop.log.*", job = "koala", source = "desktop" },
+  ]
+  sync_period = "10s"
+}
+
+// ── Server pino JSON ────────────────────────────────────────────────
+
+loki.source.file "server_pino" {
+  targets    = local.file_match.server_pino.targets
+  forward_to = [loki.process.koala_pino.receiver]
+}
+
+// Lightweight pino decoration: expose the numeric level as a label
+// "lvl" (10/20/30/40/50/60) so dashboards can filter without having to
+// reparse the JSON for every panel.
+loki.process "koala_pino" {
+  stage.json {
+    expressions = {
+      level_num = "level",
+      src_extra = "source",
+    }
+  }
+  stage.labels {
+    values = {
+      lvl       = "level_num",
+      src_extra = "src_extra",
+    }
+  }
+  forward_to = [loki.write.default.receiver]
+}
+
+// ── Cron log (plain-text) ───────────────────────────────────────────
+loki.source.file "server_cron" {
+  targets    = local.file_match.server_cron.targets
+  forward_to = [loki.write.default.receiver]
+}
+
+// ── Desktop tracing text format ─────────────────────────────────────
+//
+// Example line:
+//   2026-04-19T10:10:50.017842Z  INFO ThreadId(05) koala_tv_desktop::services::ytdlp_updater: yt-dlp up-to-date version=Some("2026.03.17")
+
+loki.source.file "desktop_tracing" {
+  targets    = local.file_match.desktop_tracing.targets
+  forward_to = [loki.process.koala_desktop.receiver]
+}
+
+loki.process "koala_desktop" {
+  stage.regex {
+    expression = `^(?P<ts>\S+)\s+(?P<lvl_str>\S+)\s+\S+\s+(?P<target>[^:]+):\s+(?P<msg>.*)$`
+  }
+  stage.labels {
+    values = {
+      lvl_str = "lvl_str",
+    }
+  }
+  forward_to = [loki.write.default.receiver]
+}
+
+// ── Output ──────────────────────────────────────────────────────────
+loki.write "default" {
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+  }
+  external_labels = {
+    stack = "koala-tv",
+  }
+}

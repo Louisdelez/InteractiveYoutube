@@ -241,6 +241,11 @@ async function clearAllChatHistory(io) {
     keys.push(...batch);
   } while (cursor !== '0');
 
+  // Legacy orphan from pre-per-channel refactor: single `chat:history` list
+  // that SCAN 'chat:history:*' never matches. Delete unconditionally —
+  // no current code reads or writes it.
+  keys.push('chat:history');
+
   if (keys.length > 0) await redis.del(...keys);
   if (io) io.emit('chat:cleared');
   return keys.length;

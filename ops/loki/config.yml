@@ -1,0 +1,70 @@
+# Minimal single-instance Loki 3.x config with filesystem storage.
+# 30-day retention — plenty for a personal/dev project.
+
+auth_enabled: false
+
+server:
+  http_listen_port: 3100
+  grpc_listen_port: 9095
+  log_level: warn
+
+common:
+  instance_addr: 127.0.0.1
+  path_prefix: /loki
+  replication_factor: 1
+  ring:
+    instance_addr: 127.0.0.1
+    kvstore:
+      store: inmemory
+  storage:
+    filesystem:
+      chunks_directory: /loki/chunks
+      rules_directory: /loki/rules
+
+# Explicit single-instance ingester lifecycle. Without these, the
+# ingester can silently fail to (re)register in the ring after the
+# container's first healthcheck attempt, leaving the ring empty and
+# all writes failing with `empty ring` / `context deadline exceeded`
+# until the container is restarted — which was the root cause of the
+# 2026-04-23 system hang (Loki spun for 2h+ in that state, Docker
+# healthchecks fork-spammed wget, snapd got OOM-killed, system froze).
+ingester:
+  lifecycler:
+    address: 127.0.0.1
+    ring:
+      kvstore:
+        store: inmemory
+      replication_factor: 1
+    final_sleep: 0s
+  chunk_idle_period: 1h
+  chunk_retain_period: 30s
+  max_chunk_age: 1h
+
+schema_config:
+  configs:
+    - from: 2024-01-01
+      store: tsdb
+      object_store: filesystem
+      schema: v13
+      index:
+        prefix: index_
+        period: 24h
+
+compactor:
+  working_directory: /loki/compactor
+  delete_request_store: filesystem
+  retention_enabled: true
+
+limits_config:
+  retention_period: 30d
+  reject_old_samples: true
+  reject_old_samples_max_age: 168h   # 7d — future-dated or very stale lines are rejected
+  allow_structured_metadata: true
+  volume_enabled: true
+  max_query_series: 1000
+
+ruler:
+  alertmanager_url: http://localhost:9093
+
+analytics:
+  reporting_enabled: false

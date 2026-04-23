@@ -148,6 +148,7 @@ async function runDailyMaintenance(job) {
         cursor = next;
         remaining.push(...batch);
       } while (cursor !== '0');
+      if (await redis.exists('chat:history')) remaining.push('chat:history');
       if (remaining.length > 0) {
         log.warn({ leftovers: remaining.length }, '[5/5] force-deleting leftover chat keys');
         await redis.del(...remaining);
