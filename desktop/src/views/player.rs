@@ -931,7 +931,7 @@ impl PlayerView {
                                                     // hard mute toggle.
                                                     fade_volume(p.mpv.clone(), 100, 0, 80, cx);
                                                     if let Some(b) = p.backup.as_ref() {
-                                                        fade_volume(b.mpv.clone(), 0, 100, 80, cx);
+                                                        fade_volume_ipc(b.mpv.clone(), 0, 100, 80, cx);
                                                     }
                                                     p.using_backup = true;
                                                     p.cache_stall_since = None;
@@ -1001,7 +1001,7 @@ impl PlayerView {
                                                 }
                                                 // Audio crossfade 120ms.
                                                 if let Some(b) = p.backup.as_ref() {
-                                                    fade_volume(b.mpv.clone(), 100, 0, 120, cx);
+                                                    fade_volume_ipc(b.mpv.clone(), 100, 0, 120, cx);
                                                 }
                                                 fade_volume(p.mpv.clone(), 0, 100, 120, cx);
                                                 // Move backup off-screen instead
@@ -2309,6 +2309,40 @@ fn fade_volume<T: 'static>(
             if let Ok(m) = mpv.lock() {
                 let _ = m.set_property("volume", v);
             }
+            cx.background_executor()
+                .timer(std::time::Duration::from_millis(16))
+                .await;
+        }
+    })
+    .detach();
+}
+
+/// Same as `fade_volume` but for the external-IPC backup player.
+/// Split overload instead of a trait generic because during Phase 2
+/// the main still uses `libmpv2::Mpv` while the backup is already
+/// `MpvIpcClient` — the signatures don't unify cleanly until Phase 3
+/// retires the main's `Arc<Mutex<Mpv>>` too.
+fn fade_volume_ipc<T: 'static>(
+    mpv: crate::services::mpv_ipc::MpvIpcClient,
+    from: i64,
+    to: i64,
+    total_ms: u64,
+    cx: &mut Context<T>,
+) {
+    let start = std::time::Instant::now();
+    let total = std::time::Duration::from_millis(total_ms);
+    cx.spawn(async move |_, cx| {
+        let from_f = from as f64;
+        let to_f = to as f64;
+        loop {
+            let elapsed = start.elapsed();
+            if elapsed >= total {
+                let _ = mpv.set_property("volume", to);
+                break;
+            }
+            let t = elapsed.as_millis() as f64 / total_ms.max(1) as f64;
+            let v = (from_f + (to_f - from_f) * t).round() as i64;
+            let _ = mpv.set_property("volume", v);
             cx.background_executor()
                 .timer(std::time::Duration::from_millis(16))
                 .await;
