@@ -100,8 +100,15 @@ impl BackupPlayer {
                 init.set_property("wid", window as i64)?;
                 init.set_property("ytdl", "yes")?;
                 // Cheapest stream: smallest height, lowest bitrate, audio
-                // included where possible.
-                init.set_property("ytdl-format", "worst[height<=360]/worst")?;
+                // included where possible. **Exclude AV1** — YouTube
+                // increasingly serves AV1 but GPUs older than Ampere
+                // (RTX 30-series) have no NVDEC AV1, so mpv falls back
+                // to `dav1d` software decode and eats ~30 % CPU even
+                // on a 360p stream.
+                init.set_property(
+                    "ytdl-format",
+                    "worst[height<=360][vcodec!*=av01]/worst[vcodec!*=av01]/worst",
+                )?;
                 init.set_property("osc", "no")?;
                 init.set_property("input-default-bindings", "no")?;
                 init.set_property("input-vo-keyboard", "no")?;
@@ -110,11 +117,12 @@ impl BackupPlayer {
                 init.set_property("hwdec", "auto-safe")?;
                 init.set_property("cache", "yes")?;
                 // Backup is the *low-quality* preview, loaded in parallel
-                // with main for fast-first-frame. A 10 s readahead is
-                // plenty — main takes over within ~3 s anyway, and a
-                // smaller cache means fewer HLS segment threads (libmpv
-                // spawns one per in-flight segment). Default 30 s used
-                // to translate into ~80 demux threads per backup mpv.
+                // with main for fast-first-frame. It's typically live on
+                // screen for only ~3 s before the swap-up to main, so
+                // there's no need for the 30 s default cache. 10 s of
+                // readahead is the sweet spot — any smaller and mpv
+                // loops on segment-refetching (HLS chunks are 5-10 s),
+                // which blew CPU back up to 35 % in an earlier pass.
                 init.set_property("cache-secs", 10i64)?;
                 init.set_property("demuxer-readahead-secs", 6i64)?;
                 init.set_property("demuxer-max-bytes", 40 * 1024 * 1024i64)?;
@@ -254,14 +262,11 @@ impl BackupPlayer {
         self.visible = false;
         if let Ok(mpv) = self.mpv.lock() {
             let _ = mpv.set_property("mute", true);
-            // Shrink the demuxer while parked. Each cached backup used
-            // to hold the default 30 s readahead + a full HLS segment
-            // thread pool — with a cache capacity of 5 channels that's
-            // where the ~150 "demux" threads seen at runtime came from.
-            // Cutting readahead to 5 s and the byte budget to 20 MiB
-            // releases most of those threads and ~30-60 MB/backup of
-            // RAM. thaw() restores the defaults so live-visible backups
-            // keep the 30 s cushion they need for smooth playback.
+            // Shrink the demuxer while parked. 5 s of readahead is enough
+            // to cover a small network blip if the user zaps back,
+            // without forcing mpv into a re-fetch loop (HLS segments
+            // are ~5-10 s each — any smaller cache and mpv burns CPU
+            // constantly re-downloading the same segment).
             let _ = mpv.set_property("cache-secs", 5i64);
             let _ = mpv.set_property("demuxer-readahead-secs", 5i64);
             let _ = mpv.set_property("demuxer-max-bytes", 20 * 1024 * 1024i64);

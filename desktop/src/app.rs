@@ -22,7 +22,16 @@ pub struct AppView {
     sidebar: Entity<SidebarView>,
     player: Entity<PlayerView>,
     chat: Entity<ChatView>,
-    hovered_channel: Option<String>,
+    /// (channel_id, channel_name) of the currently hovered sidebar
+    /// button. Used by the debounced hover-preload so we can check
+    /// "still hovering the same channel 300 ms later?" before kicking
+    /// off the mpv warm-up.
+    hovered_channel: Option<(String, String)>,
+    /// Monotonic version counter bumped on every hover change. The
+    /// preload closure captures the version at schedule time and
+    /// compares to the current value before firing — if the hover
+    /// changed in the meantime, the preload is skipped.
+    hover_preload_version: std::cell::Cell<u64>,
     current_channel_id: Option<String>,
     /// Channel id the client has asked the server to switch to, but whose
     /// confirming `tv:state` hasn't arrived yet. While this is `Some(id)`,
@@ -286,13 +295,78 @@ impl AppView {
                     this.hovered_channel = event.0.clone();
                     let v = hide_version_handle.get().wrapping_add(1);
                     hide_version_handle.set(v);
+                    // Independent version for the preload debounce — a
+                    // rapid series of hovers shouldn't leave multiple
+                    // queued preloads; each new hover invalidates the
+                    // previous scheduled one.
+                    let pv = this.hover_preload_version.get().wrapping_add(1);
+                    this.hover_preload_version.set(pv);
 
                     match &event.0 {
-                        Some(name) => {
+                        Some((id, name)) => {
                             if let Some(tt) = tooltip_handle.borrow_mut().as_mut() {
                                 if let Some((mx, my)) = tt.query_pointer() {
                                     tt.show(name, mx + 14, my + 16);
                                 }
+                            }
+                            // Schedule a debounced preload: after 300 ms
+                            // of continuous hover on the same channel
+                            // (the user has committed to looking at it)
+                            // create a parked BackupPlayer for it so
+                            // the click is an instant XMapRaised. If
+                            // the hover changes before the timer fires,
+                            // `hover_preload_version` mismatches and
+                            // we bail out — no wasted mpv instance.
+                            #[cfg(target_os = "linux")]
+                            {
+                                let expected_pv = pv;
+                                let channel_id = id.clone();
+                                cx.spawn(async move |this, cx| {
+                                    cx.background_executor()
+                                        .timer(Duration::from_millis(300))
+                                        .await;
+                                    if let Some(e) = this.upgrade() {
+                                        let _ = cx.update(|cx| {
+                                            e.update(cx, |app: &mut AppView, cx| {
+                                                // Hover changed → abort.
+                                                if app.hover_preload_version.get() != expected_pv {
+                                                    return;
+                                                }
+                                                // Need a cached state to
+                                                // know WHAT URL + seek
+                                                // to pre-load. Without
+                                                // it we'd have to RTT
+                                                // the server first,
+                                                // which defeats the
+                                                // purpose.
+                                                let Some(state) = app
+                                                    .last_state_per_channel
+                                                    .get(&channel_id)
+                                                    .cloned()
+                                                else {
+                                                    return;
+                                                };
+                                                let now_secs = std::time::SystemTime::now()
+                                                    .duration_since(std::time::UNIX_EPOCH)
+                                                    .map(|d| d.as_secs())
+                                                    .unwrap_or(state.server_time);
+                                                let elapsed = now_secs
+                                                    .saturating_sub(state.server_time)
+                                                    as f64;
+                                                let seek = (state.seek_to + elapsed)
+                                                    .min(state.duration.max(0.0));
+                                                let url = format!(
+                                                    "https://www.youtube.com/watch?v={}",
+                                                    state.video_id
+                                                );
+                                                app.player.update(cx, |p, cx| {
+                                                    p.preload_channel(&channel_id, &url, seek, cx);
+                                                });
+                                            });
+                                        });
+                                    }
+                                })
+                                .detach();
                             }
                         }
                         None => {
@@ -472,9 +546,19 @@ impl AppView {
                     String,
                     crate::models::tv_state::TvState,
                 )>();
-                for id in channel_ids {
+                // Bounded worker pool (8 threads) pulling ids off a
+                // shared queue. Firing all 48 HTTP requests at once
+                // briefly spawned ~48 threads + reqwest internals, and
+                // each socket hit the server at the same time. 8 × 6
+                // sequential requests = the same ~100 ms total with a
+                // flat 8-thread footprint.
+                let queue = Arc::new(Mutex::new(channel_ids));
+                for _ in 0..8 {
                     let tx = tx.clone();
-                    std::thread::spawn(move || {
+                    let queue = queue.clone();
+                    std::thread::spawn(move || loop {
+                        let next = { queue.lock().ok().and_then(|mut q| q.pop()) };
+                        let Some(id) = next else { break };
                         if let Ok(state) = api::fetch_tv_state(&id) {
                             let _ = tx.send((id, state));
                         }
@@ -891,6 +975,7 @@ impl AppView {
                 player,
                 chat,
                 hovered_channel: None,
+                hover_preload_version: std::cell::Cell::new(0),
                 current_channel_id: initial_channel_id,
                 pending_channel_switch: None,
                 avatar_bytes: std::collections::HashMap::new(),

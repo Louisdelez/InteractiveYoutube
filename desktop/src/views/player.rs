@@ -252,14 +252,36 @@ fn lang_display_name(code: &str) -> &str {
     }
 }
 
+// **No AV1**: YouTube increasingly serves AV1 but GPUs older than
+// NVIDIA Ampere (RTX 30-series) + AMD RDNA 2 have no hardware AV1
+// decode. Without hwdec, mpv falls back to `dav1d` software decode
+// which eats 30-40 % CPU even on 360p. The `[vcodec!*=av01]` filter
+// excludes AV1 codecs from yt-dlp's format selection; the fallback
+// chain gracefully degrades if no non-AV1 variant exists at that
+// height. Users with Ampere+ GPUs are still fine on H.264/VP9 —
+// they just don't get the bandwidth savings of AV1, which is a
+// reasonable trade.
 const QUALITIES: &[(&str, &str)] = &[
-    // Auto = try 1080p (separate streams muxed by mpv), fallback to best
-    // pre-muxed stream (~720p) if the 1080p combo isn't available.
-    ("Auto", "bestvideo[height<=1080]+bestaudio/best[height<=1080]/best"),
-    ("1080p", "bestvideo[height<=1080]+bestaudio/best[height<=1080]"),
-    ("720p", "bestvideo[height<=720]+bestaudio/best[height<=720]"),
-    ("480p", "bestvideo[height<=480]+bestaudio/best[height<=480]"),
-    ("360p", "bestvideo[height<=360]+bestaudio/best[height<=360]"),
+    (
+        "Auto",
+        "bestvideo[height<=1080][vcodec!*=av01]+bestaudio/best[height<=1080][vcodec!*=av01]/best[vcodec!*=av01]/best",
+    ),
+    (
+        "1080p",
+        "bestvideo[height<=1080][vcodec!*=av01]+bestaudio/best[height<=1080][vcodec!*=av01]",
+    ),
+    (
+        "720p",
+        "bestvideo[height<=720][vcodec!*=av01]+bestaudio/best[height<=720][vcodec!*=av01]",
+    ),
+    (
+        "480p",
+        "bestvideo[height<=480][vcodec!*=av01]+bestaudio/best[height<=480][vcodec!*=av01]",
+    ),
+    (
+        "360p",
+        "bestvideo[height<=360][vcodec!*=av01]+bestaudio/best[height<=360][vcodec!*=av01]",
+    ),
 ];
 
 pub struct PlayerView {
@@ -1467,6 +1489,60 @@ impl PlayerView {
     #[cfg(target_os = "linux")]
     pub fn purge_memory_cache(&mut self) {
         self.memory_cache.clear();
+    }
+
+    /// Preemptively warm a channel: create a fresh backup mpv for
+    /// `channel_id`, start it on `url` at `seek_to`, freeze it and push
+    /// into the memory cache so a subsequent click is an instant
+    /// XMapRaised. Called from the sidebar hover handler (debounced).
+    /// No-op if the channel is already the current one or already
+    /// cached. The LRU in memory_cache evicts the oldest parked backup
+    /// if we overflow capacity — so this is self-bounding.
+    #[cfg(target_os = "linux")]
+    pub fn preload_channel(
+        &mut self,
+        channel_id: &str,
+        url: &str,
+        seek_to: f64,
+        cx: &mut Context<Self>,
+    ) {
+        // Don't preload the current channel or anything already cached.
+        if self.current_channel_id.as_deref() == Some(channel_id) {
+            return;
+        }
+        if self.memory_cache.contains(channel_id) {
+            return;
+        }
+        // Capacity 0 = feature disabled by the user.
+        if self.memory_cache.capacity() == 0 {
+            return;
+        }
+        let parent_wid = self.parent_wid;
+        let xlib = self.xlib.clone();
+        let display = self.display;
+        let Some(mut backup) = BackupPlayer::new(parent_wid, xlib, display) else {
+            return;
+        };
+        // Put the preload window off-screen BEFORE anything else so it
+        // never flashes in the player area — its first frame will be
+        // decoded silently, and `show()` only runs if the user actually
+        // zaps to this channel.
+        if let Some((x, y, w, h)) = self.last_area {
+            backup.set_geometry(-10000, -10000, w.max(1), h.max(1));
+            let _ = (x, y); // not used for off-screen preload
+        }
+        backup.load(url, seek_to);
+        backup.freeze();
+        self.memory_cache.push(MemorizedChannel {
+            channel_id: channel_id.to_string(),
+            backup,
+        });
+        cx.emit(MemoryChanged(self.memory_cache.channel_ids()));
+        log_quality(&format!(
+            "preload: warmed {} (cache now {} entries)",
+            channel_id,
+            self.memory_cache.len()
+        ));
     }
 
     /// Push channel info (name + avatar bytes) into the X11 "now

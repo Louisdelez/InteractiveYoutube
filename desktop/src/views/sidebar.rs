@@ -24,9 +24,13 @@ pub struct ChannelSelected {
 
 impl EventEmitter<ChannelSelected> for SidebarView {}
 
-/// Event emitted when the hovered channel changes (None = nothing hovered).
+/// Event emitted when the hovered channel changes. `None` = the pointer
+/// left a channel button (no replacement). The tuple carries
+/// `(channel_id, channel_name)` — the id is used by AppView for
+/// hover-triggered preload (so the first click on a cold channel is
+/// already warm), the name drives the tooltip.
 #[derive(Clone, Debug)]
-pub struct ChannelHovered(pub Option<String>);
+pub struct ChannelHovered(pub Option<(String, String)>);
 
 impl EventEmitter<ChannelHovered> for SidebarView {}
 
@@ -346,8 +350,8 @@ impl SidebarView {
         let ch_name = ch.name.clone();
         let ch_handle = ch.handle.clone();
         let avatar = self.avatars.get(&ch.id).cloned();
+        let hover_id = ch.id.clone();
         let hover_name = ch.name.clone();
-        let hover_name_leave = ch.name.clone();
         let elem_id =
             ElementId::Name(format!("{}-{}", ch.id, id_suffix).into());
 
@@ -368,9 +372,11 @@ impl SidebarView {
             .justify_center()
             .on_hover(cx.listener(move |_view, hovered: &bool, _window, cx| {
                 if *hovered {
-                    cx.emit(ChannelHovered(Some(hover_name.clone())));
+                    cx.emit(ChannelHovered(Some((
+                        hover_id.clone(),
+                        hover_name.clone(),
+                    ))));
                 } else {
-                    let _ = &hover_name_leave;
                     cx.emit(ChannelHovered(None));
                 }
             }))

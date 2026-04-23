@@ -75,7 +75,7 @@ pub fn save(settings: &Settings) {
         return;
     };
     if let Err(e) = std::fs::create_dir_all(&dir) {
-        eprintln!("[settings] mkdir failed: {}", e);
+        tracing::warn!(err = %e, "settings mkdir failed");
         return;
     }
     let Some(path) = settings_file() else {
@@ -84,11 +84,11 @@ pub fn save(settings: &Settings) {
     let json = match serde_json::to_string_pretty(settings) {
         Ok(j) => j,
         Err(e) => {
-            eprintln!("[settings] serialise failed: {}", e);
+            tracing::warn!(err = %e, "settings serialise failed");
             return;
         }
     };
     if let Err(e) = std::fs::write(&path, json) {
-        eprintln!("[settings] write failed: {}", e);
+        tracing::warn!(err = %e, "settings write failed");
     }
 }
