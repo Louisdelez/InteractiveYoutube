@@ -123,18 +123,26 @@ function setupSocketIO(httpServer) {
   io.use(async (socket, next) => {
     const ip = socket.handshake.headers['x-forwarded-for'] || socket.handshake.address;
     socket.clientIP = ip;
-    try {
-      const ipCount = await redis.incr(ipKey(ip));
-      if (ipCount === 1) {
-        await redis.expire(ipKey(ip), IP_TTL_SECS);
+    // Loopback is exempt. Same-host traffic (dev desktop, health
+    // probes, curl) has no fair-share concern, and hard-killed dev
+    // clients (pkill -9 → no clean disconnect packet → counter
+    // doesn't decrement) used to wedge the local IP past the cap
+    // until the 10-min TTL expired.
+    const isLoopback = ip === '::1' || ip === '127.0.0.1' || ip === '::ffff:127.0.0.1';
+    if (!isLoopback) {
+      try {
+        const ipCount = await redis.incr(ipKey(ip));
+        if (ipCount === 1) {
+          await redis.expire(ipKey(ip), IP_TTL_SECS);
+        }
+        if (ipCount > MAX_CONNECTIONS_PER_IP) {
+          await redis.decr(ipKey(ip));
+          return next(new Error('Too many connections from this IP'));
+        }
+      } catch (err) {
+        // Redis hiccup — fail open rather than block all auth.
+        log.warn({ err: err.message }, 'ip-limit redis check failed');
       }
-      if (ipCount > MAX_CONNECTIONS_PER_IP) {
-        await redis.decr(ipKey(ip));
-        return next(new Error('Too many connections from this IP'));
-      }
-    } catch (err) {
-      // Redis hiccup — fail open rather than block all auth.
-      log.warn({ err: err.message }, 'ip-limit redis check failed');
     }
 
     const cookieHeader = socket.handshake.headers.cookie;
@@ -241,9 +249,13 @@ function setupSocketIO(httpServer) {
       } catch (err) {
         log.warn({ err: err.message, sid: socket.id }, 'disconnect cleanup failed');
       }
-      try {
-        await redis.decr(ipKey(socket.clientIP));
-      } catch (_) {}
+      const ip = socket.clientIP;
+      const isLoopback = ip === '::1' || ip === '127.0.0.1' || ip === '::ffff:127.0.0.1';
+      if (!isLoopback) {
+        try {
+          await redis.decr(ipKey(ip));
+        } catch (_) {}
+      }
       log.info({ sid: socket.id }, 'socket disconnected');
     });
   });
