@@ -62,6 +62,12 @@ pub enum RemoteCommand {
     NextChannel,
     PrevMemory,
     SelectChannel { id: String },
+    /// Force-resume playback — unpauses mpv + seeks 0 relative to
+    /// flush the demuxer. Same action as the desktop's own Play
+    /// button in the control bar ; useful when a channel is stuck
+    /// on a frozen frame (stalled demuxer, bad priority-video
+    /// transition, etc.).
+    ForcePlay,
 }
 
 /// Desktop → Phone. Pushed on connect + every time the GPUI side

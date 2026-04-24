@@ -22,6 +22,7 @@
   const $btnVolDown = document.getElementById("btn-vol-down");
   const $btnVolUp = document.getElementById("btn-vol-up");
   const $btnPrev = document.getElementById("btn-prev");
+  const $btnPlay = document.getElementById("btn-play");
   const $btnNext = document.getElementById("btn-next");
   const $status = document.getElementById("status-bar");
 
@@ -204,6 +205,7 @@
   tap($btnVolDown, { cmd: "volume_down" });
   tap($btnVolUp, { cmd: "volume_up" });
   tap($btnPrev, { cmd: "prev_memory" });
+  tap($btnPlay, { cmd: "force_play" });
   tap($btnNext, { cmd: "next_channel" });
 
   // ── Boot ──────────────────────────────────────────────────────────

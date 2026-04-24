@@ -237,8 +237,8 @@ body {
 /* Footer controls */
 .controls {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr 1fr;
-  gap: 10px;
+  grid-template-columns: 1fr 1fr 1.2fr 1fr 1fr;
+  gap: 8px;
   padding: 14px 16px 20px;
   border-top: 1px solid var(--border);
   background: var(--bg-elev);
@@ -261,6 +261,18 @@ body {
   background: var(--accent);
   border-color: var(--accent);
   transform: scale(0.96);
+}
+
+.ctrl-play {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #ffffff;
+  box-shadow: 0 0 0 4px var(--accent-glow);
+}
+
+.ctrl-play:active {
+  background: #b57edc;
+  border-color: #b57edc;
 }
 
 /* Connection status bar */

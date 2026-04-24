@@ -530,6 +530,9 @@ fn handle_remote_command(
                 }
             }
         }
+        RemoteCommand::ForcePlay => {
+            app.player.update(cx, |p, _| p.force_play());
+        }
     }
 }
 
