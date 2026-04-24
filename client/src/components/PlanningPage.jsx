@@ -210,7 +210,7 @@ export default function PlanningPage({ onBack, channelId, channels }) {
             className="pl-week-btn"
             onClick={() => setWeekOffset((w) => Math.max(0, w - 1))}
             disabled={weekOffset === 0}
-            title="Semaine précédente"
+            title={t('planning.prev_week')}
           >
             <ChevronLeft size={15} />
           </button>
@@ -224,7 +224,7 @@ export default function PlanningPage({ onBack, channelId, channels }) {
             className="pl-week-btn"
             onClick={() => setWeekOffset((w) => Math.min(1, w + 1))}
             disabled={weekOffset === 1}
-            title="Semaine prochaine"
+            title={t('planning.next_week')}
           >
             <ChevronRight size={15} />
           </button>

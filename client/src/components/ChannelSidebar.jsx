@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { ChevronRight, History, Star, Tv } from 'lucide-react';
 import { api } from '../services/api';
+import { t } from '../i18n';
 import './ChannelSidebar.css';
 
 // Kept as a fallback for the first paint before `/api/tv/channels` resolves
@@ -184,7 +185,7 @@ export default function ChannelSidebar({
       <div className="channel-list" ref={listRef}>
         {showSections && historyItems.length > 0 && (
           <>
-            <div className="channel-section-header" title="Historique — clic droit sur une chaîne pour la mettre en favori">
+            <div className="channel-section-header" title={t('sidebar.history.title')}>
               <History size={12} />
             </div>
             {historyItems.map((ch) => renderRow(ch, 'h'))}
@@ -193,7 +194,7 @@ export default function ChannelSidebar({
         )}
         {showSections && favoriteItems.length > 0 && (
           <>
-            <div className="channel-section-header" title="Favoris">
+            <div className="channel-section-header" title={t('sidebar.favorites.title')}>
               <Star size={12} />
             </div>
             {favoriteItems.map((ch) => renderRow(ch, 'f'))}

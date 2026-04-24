@@ -181,60 +181,60 @@ export default function App() {
           <img src="/koala-tv.png" alt="" className="top-bar-logo" />
           <span className="top-bar-title">
             Koala TV
-            <span className="top-bar-lite" title="Version navigateur — moins de features que l'app desktop"> Lite</span>
+            <span className="top-bar-lite" title={t('topbar.lite.title')}> {t('topbar.lite.badge')}</span>
           </span>
           <a
             href={REPO_URL}
             target="_blank"
             rel="noopener noreferrer"
             className="top-bar-github"
-            title="Voir sur GitHub"
+            title={t('topbar.github.title')}
           >
             <GithubIcon size={15} />
           </a>
-          <span className="top-bar-viewers" title="Viewers en ligne (toutes chaînes)">
+          <span className="top-bar-viewers" title={t('topbar.viewers.title')}>
             <Eye size={13} />
             <span>{totalViewers}</span>
           </span>
           <a
             href="#download"
             className="top-bar-download"
-            title="Télécharger l'app desktop"
+            title={t('topbar.download.title')}
           >
             <Download size={13} />
-            <span>Télécharger</span>
+            <span>{t('topbar.download.label')}</span>
           </a>
           <a
             href="#about"
             className="top-bar-about"
-            title="À propos du projet"
+            title={t('topbar.about.title')}
           >
             <Info size={13} />
-            <span>À propos</span>
+            <span>{t('topbar.about.label')}</span>
           </a>
           <a
             href="#status"
             className="top-bar-about"
-            title="État des services Koala TV"
+            title={t('topbar.status.title')}
           >
             <Activity size={13} />
-            <span>Status</span>
+            <span>{t('topbar.status.label')}</span>
           </a>
         </div>
         <div className="top-bar-search">
           <Search size={14} />
           <input
             type="text"
-            placeholder="Rechercher une chaîne..."
+            placeholder={t('topbar.search.placeholder')}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="top-bar-search-input"
           />
         </div>
         <div className="top-bar-right">
-          <a href="#planning" className="top-bar-planning" title="Programme de la semaine">
+          <a href="#planning" className="top-bar-planning" title={t('topbar.planning.title')}>
             <Calendar size={14} />
-            <span>Programme</span>
+            <span>{t('topbar.programme.label.short')}</span>
           </a>
           <button className="chat-toggle" onClick={() => setChatOpen(!chatOpen)}>
             {chatOpen ? <MessageSquareOff size={15} /> : <MessageSquare size={15} />}

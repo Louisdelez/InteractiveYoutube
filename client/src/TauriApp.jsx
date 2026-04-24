@@ -180,7 +180,7 @@ export default function TauriApp() {
             target="_blank"
             rel="noopener noreferrer"
             className="tauri-topbar-github"
-            title="Voir sur GitHub"
+            title={t('topbar.github.title')}
           >
             <GithubIcon size={15} />
           </a>
@@ -189,7 +189,7 @@ export default function TauriApp() {
           <Search size={14} />
           <input
             type="text"
-            placeholder="Rechercher une chaîne..."
+            placeholder={t('topbar.search.placeholder')}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />

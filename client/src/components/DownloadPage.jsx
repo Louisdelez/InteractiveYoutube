@@ -158,7 +158,7 @@ export default function DownloadPage({ onBack }) {
   return (
     <div className="dl-page">
       <header className="dl-header">
-        <button className="dl-back" onClick={onBack} title="Retour à l'app">
+        <button className="dl-back" onClick={onBack} title={t('download.back_title')}>
           <ArrowLeft size={16} />
           <span>{t('status.back')}</span>
         </button>
