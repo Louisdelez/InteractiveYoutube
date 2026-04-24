@@ -663,10 +663,23 @@ impl PlayerView {
                 (self.xlib.XMoveResizeWindow)(self.display, self.child_window, x, y, width, height);
                 (self.xlib.XFlush)(self.display);
             }
-            // Keep the backup window stacked on top of the main, same coords
-            // so that show()/hide() doesn't shift the visible area.
+            // Keep the backup window's size in sync with the video area
+            // so a future swap-to-backup is pre-sized. Positioning rules:
+            //  - using_backup=true  → same coords as main (stacked on top
+            //    via the earlier XMapRaised so it's the visible surface).
+            //  - using_backup=false → pinned off-screen. BackupPlayer
+            //    windows are never XUnmap'd (XUnmap stalls the decoder),
+            //    so a repositioning here to the on-screen area would
+            //    instantly reveal the backup LQ stream on top of main —
+            //    which was the "quality dropped after closing settings
+            //    and never recovers" bug (apply_geometry fires on every
+            //    modal hide→show cycle via last_area=None reset).
             if let Some(b) = self.backup.as_ref() {
-                b.set_geometry(x, y, width, height);
+                if self.using_backup {
+                    b.set_geometry(x, y, width, height);
+                } else {
+                    b.set_geometry(-10000, -10000, width, height);
+                }
             }
             if size_changed {
                 {
