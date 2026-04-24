@@ -154,14 +154,14 @@ fn load_all() -> AllData {
     if !skin_tones.is_empty() {
         out.push(EmojiCategory {
             id: "skin_tones",
-            label: "Teintes de peau".to_string(),
+            label: crate::i18n::t("emoji.category.skin_tones"),
             emojis: skin_tones,
         });
     }
     if !combos.is_empty() {
         out.push(EmojiCategory {
             id: "combos",
-            label: "Combinaisons".to_string(),
+            label: crate::i18n::t("emoji.category.combos"),
             emojis: combos,
         });
     }

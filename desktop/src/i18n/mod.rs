@@ -43,3 +43,17 @@ pub fn t(key: &str) -> String {
     }
     key.to_string()
 }
+
+/// `t()` + minimal `{name}` placeholder interpolation. Unknown
+/// placeholders are left in the output literally so gaps are visible.
+///
+/// ```ignore
+/// t_args("settings.memory.hint.many", &[("n", "4"), ("mb", "300"), ("cpu", "15")])
+/// ```
+pub fn t_args(key: &str, args: &[(&str, &str)]) -> String {
+    let mut s = t(key);
+    for (k, v) in args {
+        s = s.replace(&format!("{{{}}}", k), v);
+    }
+    s
+}

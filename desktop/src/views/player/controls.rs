@@ -82,7 +82,7 @@ impl PlayerView {
             } else if !title.is_empty() {
                 title
             } else {
-                format!("Audio {}", id)
+                crate::i18n::t_args("player.audio_track_fmt", &[("id", &id.to_string())])
             };
             tracks.push((id, label));
         }
@@ -245,10 +245,10 @@ impl PlayerView {
                 if !self.show_all_sub_langs {
                     let total = self.list_all_sub_tracks_filtered(false).len();
                     if total > tracks.len() {
-                        items.push("Plus de langues…".to_string());
+                        items.push(crate::i18n::t("player.captions_more_langs"));
                     }
                 } else {
-                    items.push("Moins de langues".to_string());
+                    items.push(crate::i18n::t("player.captions_fewer_langs"));
                 }
                 (items, selected)
             }
@@ -256,7 +256,7 @@ impl PlayerView {
                 let tracks = self.list_audio_tracks();
                 let current_aid = self.mpv.get_property::<i64>("aid").ok();
                 let items: Vec<String> = if tracks.is_empty() {
-                    vec!["(aucune piste)".to_string()]
+                    vec![crate::i18n::t("player.audio_none")]
                 } else {
                     tracks.iter().map(|(_, l)| l.clone()).collect()
                 };

@@ -41,19 +41,19 @@ pub fn format_published_tooltip(iso: &str) -> Option<String> {
     let day: u32 = parts[2].parse().ok()?;
     if !(1..=12).contains(&month) { return None; }
 
-    let months_fr = [
-        "", "janvier", "février", "mars", "avril", "mai", "juin",
-        "juillet", "août", "septembre", "octobre", "novembre", "décembre",
-    ];
-    let days_fr = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"];
+    let months_long = crate::i18n::t("date.months.long");
+    let months: Vec<&str> = months_long.split(',').collect();
+    let days_long = crate::i18n::t("date.days.long");
+    let days: Vec<&str> = days_long.split(',').collect();
 
     let t_tbl = [0i32, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4];
     let y = if month < 3 { year - 1 } else { year };
     let dow = ((y + y / 4 - y / 100 + y / 400 + t_tbl[month as usize - 1] + day as i32)
         .rem_euclid(7)) as usize;
     let dow_mon = if dow == 0 { 6 } else { dow - 1 };
-    let day_name = days_fr.get(dow_mon).copied().unwrap_or("");
-    let month_name = months_fr.get(month as usize).copied().unwrap_or("");
+    let day_name = days.get(dow_mon).copied().unwrap_or("");
+    // Month 1..=12 into array index 0..=11
+    let month_name = months.get(month as usize - 1).copied().unwrap_or("");
 
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -61,18 +61,18 @@ pub fn format_published_tooltip(iso: &str) -> Option<String> {
     let now_year = 1970 + (now.as_secs() / 31_557_600) as i32;
     let diff_years = now_year - year;
     let ago = if diff_years >= 2 {
-        format!("il y a {} ans", diff_years)
+        crate::i18n::t_args("date.ago.years_plural", &[("n", &diff_years.to_string())])
     } else if diff_years == 1 {
-        "il y a 1 an".to_string()
+        crate::i18n::t("date.ago.year_one")
     } else {
         let now_month = ((now.as_secs() % 31_557_600) / 2_629_800) as u32 + 1;
         let diff_months = (now_year - year) as u32 * 12 + now_month.saturating_sub(month);
         if diff_months > 1 {
-            format!("il y a {} mois", diff_months)
+            crate::i18n::t_args("date.ago.months_plural", &[("n", &diff_months.to_string())])
         } else if diff_months == 1 {
-            "il y a 1 mois".to_string()
+            crate::i18n::t("date.ago.month_one")
         } else {
-            "récente".to_string()
+            crate::i18n::t("date.ago.recent")
         }
     };
 

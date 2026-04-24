@@ -153,14 +153,17 @@ impl Render for SettingsModal {
                     // Resource warning when > 2
                     .child({
                         let warn = match cap {
-                            0 => "Désactivé — aucun cache, retour à la chaîne précédente prendra 1-3 s.".to_string(),
-                            2 => "Recommandé — ~50-100 MB extra, ~5 % CPU.".to_string(),
-                            n => format!(
-                                "{} chaînes — ~{} MB extra, ~{} % CPU continu (consomme aussi de la bande passante).",
-                                n,
-                                ((n as u32 - 1) * 100),
-                                ((n as u32 - 1) * 5),
-                            ),
+                            0 => crate::i18n::t("settings.memory.hint.disabled"),
+                            2 => crate::i18n::t("settings.memory.hint.recommended"),
+                            n => {
+                                let n_str = n.to_string();
+                                let mb = ((n as u32 - 1) * 100).to_string();
+                                let cpu = ((n as u32 - 1) * 5).to_string();
+                                crate::i18n::t_args(
+                                    "settings.memory.hint.many",
+                                    &[("n", &n_str), ("mb", &mb), ("cpu", &cpu)],
+                                )
+                            }
                         };
                         div()
                             .text_xs()
@@ -238,17 +241,17 @@ impl Render for SettingsModal {
                     )
                     .child({
                         let hint = match quality {
-                            0 => "Auto — tente 1080p, redescend si indisponible. Meilleur visuel.",
-                            1 => "1080p — qualité max. ~27 % CPU continu sur GTX 1630.",
-                            2 => "720p — ~5-8 % CPU de moins, qualité encore excellente.",
-                            3 => "480p — léger mais visible sur grand écran.",
-                            4 => "360p — minimal CPU / bande passante. Pour WiFi faible.",
-                            _ => "",
+                            0 => crate::i18n::t("settings.quality.hint.auto"),
+                            1 => crate::i18n::t("settings.quality.hint.1080"),
+                            2 => crate::i18n::t("settings.quality.hint.720"),
+                            3 => crate::i18n::t("settings.quality.hint.480"),
+                            4 => crate::i18n::t("settings.quality.hint.360"),
+                            _ => String::new(),
                         };
                         div()
                             .text_xs()
                             .text_color(rgb(0x6b7280))
-                            .child(hint.to_string())
+                            .child(hint)
                     }),
             )
     }

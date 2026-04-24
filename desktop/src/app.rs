@@ -126,7 +126,7 @@ impl AppView {
         cx.new(|cx| {
             // Search input in topbar
             let search_state = cx.new(|cx| {
-                InputState::new(window, cx).placeholder("Rechercher une chaîne…")
+                InputState::new(window, cx).placeholder(t("topbar.search.placeholder"))
             });
             let sidebar_search = sidebar.clone();
             let search_handle = search_state.clone();

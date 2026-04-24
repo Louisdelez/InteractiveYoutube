@@ -80,11 +80,10 @@ fn fmt_day(ms: i64) -> String {
     let t: libc::time_t = secs as libc::time_t;
     let mut tm: libc::tm = unsafe { std::mem::zeroed() };
     unsafe { libc::localtime_r(&t, &mut tm); }
-    let months = [
-        "janv.", "févr.", "mars", "avr.", "mai", "juin",
-        "juil.", "août", "sept.", "oct.", "nov.", "déc.",
-    ];
-    format!("{:02} {}", tm.tm_mday, months[tm.tm_mon as usize])
+    let months_short = crate::i18n::t("date.months.short");
+    let months: Vec<&str> = months_short.split(',').collect();
+    let month = months.get(tm.tm_mon as usize).copied().unwrap_or("");
+    format!("{:02} {}", tm.tm_mday, month)
 }
 
 fn is_today_ms(ms: i64, now_ms: i64) -> bool {
@@ -263,7 +262,11 @@ impl Render for PlanningView {
         let now_base_week = start_of_week_ms(self.now_ms);
         let week_start = add_days_ms(now_base_week, self.week_offset as i64 * 7);
         let days = week_days(week_start);
-        let week_label = if self.week_offset == 0 { "Cette semaine" } else { "Semaine prochaine" };
+        let week_label = if self.week_offset == 0 {
+            crate::i18n::t("planning.week.current")
+        } else {
+            crate::i18n::t("planning.week.next")
+        };
         let range_label = format!("{} — {}", fmt_day(days[0]), fmt_day(days[6]));
 
         // Auto-scroll to the current hour once the grid is laid out. The
@@ -440,7 +443,7 @@ impl Render for PlanningView {
                 .items_center()
                 .justify_center()
                 .text_color(rgb(0xef4444))
-                .child("Playlist indisponible.")
+                .child(crate::i18n::t("planning.playlist_unavailable"))
                 .into_any_element()
         };
 
