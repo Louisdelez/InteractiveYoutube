@@ -1831,7 +1831,7 @@ impl Render for AppView {
                     .text_xs()
                     .font_weight(FontWeight::SEMIBOLD)
                     .text_color(rgb(0xffffff))
-                    .child("Maintenance dans 5 minutes — le chat sera clear et le serveur redémarre")
+                    .child(t("maintenance.warning_banner"))
                     .into_any_element()
             } else {
                 div().into_any_element()
@@ -1864,7 +1864,7 @@ impl Render for AppView {
                                         .text_lg()
                                         .font_weight(FontWeight::BOLD)
                                         .text_color(rgb(0x9b59b6))
-                                        .child("Maintenance en cours")
+                                        .child(t("maintenance.ongoing_title"))
                                 )
                                 .child(
                                     div()
