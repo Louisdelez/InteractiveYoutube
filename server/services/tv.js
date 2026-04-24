@@ -168,6 +168,27 @@ function getTvState(channelId) {
     };
   }
 
+  // Auto-advance detection: when the playlist rotation lands on a new
+  // video vs. what we remembered, the URL cache for this channel is
+  // stale (it was keyed to the previous video). Fire-and-forget a
+  // fresh resolve so the NEXT tv:state request serves a warm URL
+  // instead of falling through to ytdl_hook on the client. Without
+  // this, zap hit rate drops to ~50% between the 30-min sweeps
+  // (every ~5-15 min of video → every other click misses cache).
+  const prevVideoId = lastVideoIds.get(channelId);
+  if (prevVideoId && prevVideoId !== normalVideoId) {
+    urlResolver.invalidate(channelId).catch(() => {});
+    // Schedule the re-resolve on next tick so we don't block the
+    // getTvState caller (this function runs on the hot socket path).
+    setImmediate(() => {
+      urlResolver
+        .resolveAndCache(channelId, normalVideoId)
+        .catch((err) => log.warn(
+          { channelId, videoId: normalVideoId, err: err.message },
+          'auto-advance resolve failed',
+        ));
+    });
+  }
   lastVideoIds.set(channelId, normalVideoId);
 
   // Return cached

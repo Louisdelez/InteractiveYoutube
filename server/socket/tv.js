@@ -56,14 +56,21 @@ function registerTvHandlers(io, socket) {
 function startSyncBroadcast(io) {
   if (syncInterval) return;
 
-  syncInterval = setInterval(() => {
+  // Enrich every tv:sync with the pre-resolved URL when available
+  // so the client's `last_state_per_channel` cache (updated on BOTH
+  // tv:state + tv:sync per dispatch.rs) carries fresh resolvedUrl
+  // for every channel, not just the ones the user actively clicked.
+  // Cost: 52 Redis GETs every 15 s = ~3.5/s, trivial.
+  syncInterval = setInterval(async () => {
     const start = Date.now();
-    for (const channel of config.CHANNELS) {
-      const state = getTvState(channel.id);
-      if (state) {
-        io.to(`channel:${channel.id}`).volatile.emit('tv:sync', state);
-      }
-    }
+    await Promise.all(
+      config.CHANNELS.map(async (channel) => {
+        const state = getTvState(channel.id);
+        if (!state) return;
+        const enriched = await enrichWithResolvedUrl(state);
+        io.to(`channel:${channel.id}`).volatile.emit('tv:sync', enriched);
+      }),
+    );
     metrics.syncBroadcastDuration.observe(Date.now() - start);
   }, config.DRIFT_CORRECTION_INTERVAL_MS);
 
