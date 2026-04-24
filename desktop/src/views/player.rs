@@ -1,5 +1,6 @@
 use gpui::*;
 use gpui_component::slider::{Slider, SliderEvent, SliderState};
+use crate::mpv_try;
 use crate::services::mpv_ipc::{MpvEvent, MpvIpcClient};
 use std::sync::{Arc, Mutex};
 
@@ -1140,14 +1141,18 @@ impl PlayerView {
                     // after would race with the next prefetch
                     // (`loadfile <next> append-play`) and silently
                     // wipe it.
-                    let _ = mpv.command("playlist-clear", &[]);
+                    mpv_try!(mpv.command("playlist-clear", &[]), "main playlist-clear");
                     // Start muted at volume 0 — the volume fade-in
                     // (in finish_audio_fade_in) ramps to 100 once the
                     // first frame is on screen.
-                    let _ = mpv.set_property("volume", 0i64);
-                    let _ = mpv.set_property("mute", false);
-                    let _ = mpv.set_property("start", format!("+{}", state.seek_to));
-                    let _ = mpv.command("loadfile", &[&url]);
+                    mpv_try!(mpv.set_property("volume", 0i64), "main set volume=0");
+                    mpv_try!(mpv.set_property("mute", false), "main unmute");
+                    mpv_try!(
+                        mpv.set_property("start", format!("+{}", state.seek_to)),
+                        "main set start",
+                        state.seek_to
+                    );
+                    mpv_try!(mpv.command("loadfile", &[&url]), "main loadfile", &url);
                 }
             }
         }
@@ -1174,7 +1179,11 @@ impl PlayerView {
                     }
                     // append-play: mpv prefetches it (yt-dlp + demuxer + buffer)
                     // and only starts when the current entry hits EOF.
-                    let _ = mpv.command("loadfile", &[&next_url, "append-play"]);
+                    mpv_try!(
+                        mpv.command("loadfile", &[&next_url, "append-play"]),
+                        "main prefetch loadfile",
+                        &next_url
+                    );
                 }
                 self.queued_next_id = Some(next_id.clone());
             }
@@ -1356,9 +1365,9 @@ impl PlayerView {
     pub fn stop_playback(&mut self) {
         {
             let mpv = &self.mpv;
-            let _ = mpv.command("stop", &[]);
-            let _ = mpv.set_property("pause", true);
-            let _ = mpv.set_property("mute", true);
+            mpv_try!(mpv.command("stop", &[]), "main stop");
+            mpv_try!(mpv.set_property("pause", true), "main pause");
+            mpv_try!(mpv.set_property("mute", true), "main mute");
         }
         if let Some(b) = self.backup.as_mut() {
             b.hide();
