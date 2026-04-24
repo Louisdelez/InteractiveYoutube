@@ -1,0 +1,58 @@
+{
+  "_comment": "Koala TV UI strings, French (canonical). Consumed by client/src/i18n/index.js (web), desktop/src/i18n/mod.rs (desktop), server/i18n/fr.js (server-emitted messages). Flat dot-separated keys, no nesting. Add new keys here first, then import in the stacks that need them.",
+
+  "_usage": "Keys follow the pattern <scope>.<feature>.<variant>. Examples: chat.title, chat.placeholder, topbar.programme.label.",
+
+  "chat.title": "Chat en direct",
+  "chat.empty": "Pas encore de messages.",
+  "chat.placeholder": "Envoyer un message…",
+  "chat.send_button": "Envoyer",
+  "chat.new_messages": "Nouveaux messages",
+  "chat.anonymous_hint": "Tu peux changer ton pseudo en cliquant sur l'icône.",
+  "chat.rate_limit_error": "Trop de messages, attends un peu.",
+  "chat.gif_loading": "Chargement GIF…",
+  "chat.connection_lost": "Connexion au chat perdue. Reconnexion…",
+  "chat.send": "Envoyer",
+  "chat.cancel": "Annuler",
+
+  "topbar.programme.label": "Programme",
+  "topbar.connect.label": "Connexion",
+  "topbar.disconnect.label": "Déconnexion",
+  "topbar.search.placeholder": "Rechercher une chaîne…",
+  "topbar.settings.label": "Paramètres",
+  "topbar.hide_chat": "Masquer le chat",
+  "topbar.show_chat": "Afficher le chat",
+
+  "player.loading": "Chargement de la TV…",
+  "player.playlist_unavailable": "Playlist non disponible",
+  "player.watch_on_youtube": "Voir sur YouTube",
+  "player.auto_advance": "Auto",
+  "player.captions_off": "Off",
+  "player.captions_more_langs": "Plus de langues…",
+  "player.captions_fewer_langs": "Moins de langues",
+
+  "auth.email.label": "Email",
+  "auth.password.label": "Mot de passe",
+  "auth.username.label": "Pseudo",
+  "auth.register": "Créer un compte",
+  "auth.login": "Se connecter",
+  "auth.logout": "Se déconnecter",
+  "auth.switch_to_register": "Pas de compte ? En créer un",
+  "auth.switch_to_login": "Déjà un compte ? Se connecter",
+
+  "maintenance.warning_title": "Maintenance dans 5 minutes",
+  "maintenance.warning_body": "Le chat sera effacé et la playlist rafraîchie.",
+  "maintenance.ongoing_title": "Maintenance en cours",
+  "maintenance.ongoing_body": "Le service reprendra automatiquement dans quelques minutes.",
+
+  "status.server_down": "Serveur indisponible",
+  "status.server_down_body": "Connexion au serveur perdue. L'application reprendra automatiquement dès que le serveur sera accessible.",
+  "status.reconnecting": "Reconnexion…",
+
+  "settings.title": "Paramètres",
+  "settings.memory.title": "Mémoire — chaînes pré-chargées",
+  "settings.memory.hint": "Garde N chaînes en mémoire pour zapper sans temps de chargement. Inclut la chaîne actuelle.",
+  "settings.memory.purge": "Purger maintenant",
+  "settings.quality.title": "Qualité vidéo",
+  "settings.quality.hint": "Qualité maximale du flux haute résolution. N'affecte pas la vitesse de zap (le flux 360p rapide mène toujours)."
+}

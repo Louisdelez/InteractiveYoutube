@@ -1,6 +1,7 @@
 use gpui::*;
 use std::collections::{HashMap, VecDeque};
 use std::sync::Arc;
+use crate::i18n::t;
 use crate::models::message::ChatMessage;
 use crate::services::emoji_data;
 use crate::views::emoji_input::{EmojiInput, EmojiInputSubmit};
@@ -302,7 +303,7 @@ impl ChatView {
                     .justify_center()
                     .text_xs()
                     .text_color(rgb(0x666666))
-                    .child("Chargement GIF...");
+                    .child(t("chat.gif_loading"));
             }
             self.gif_pending.insert(url.clone());
             let url_clone = url.clone();
@@ -352,7 +353,7 @@ impl ChatView {
                 .justify_center()
                 .text_xs()
                 .text_color(rgb(0x666666))
-                .child("Chargement GIF...");
+                .child(t("chat.gif_loading"));
         }
         self.render_rich_text(text, 16.0)
     }
@@ -381,7 +382,7 @@ impl Render for ChatView {
                     .child(
                         div().text_sm().font_weight(FontWeight::SEMIBOLD)
                             .text_color(rgb(0xefeff1))
-                            .child("Chat en direct")
+                            .child(t("chat.title"))
                     )
                     .child({
                         // Match the web ViewerCount: eye + bold count, both
@@ -414,7 +415,7 @@ impl Render for ChatView {
                         .justify_center()
                         .text_xs()
                         .text_color(rgb(0x666666))
-                        .child("Pas encore de messages.")
+                        .child(t("chat.empty"))
                 } else {
                     if self.auto_scroll {
                         self.messages_scroll.scroll_to_bottom();
@@ -504,7 +505,7 @@ impl Render for ChatView {
                             .text_color(rgb(0xffffff))
                             .cursor_pointer()
                             .hover(|s| s.bg(rgb(0xac6dc7)))
-                            .child("Nouveaux messages")
+                            .child(t("chat.new_messages"))
                             .on_click(cx.listener(|this: &mut ChatView, _, _, cx| {
                                 this.auto_scroll = true;
                                 this.messages_scroll.scroll_to_bottom();

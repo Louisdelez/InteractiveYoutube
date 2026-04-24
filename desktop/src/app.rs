@@ -4,6 +4,7 @@ use std::sync::mpsc;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
+use crate::i18n::t;
 use crate::services::api::{self, User};
 use crate::services::websocket::{self, ClientCommand, ServerEvent};
 use crate::services::settings::{self, Settings};
@@ -1568,7 +1569,7 @@ impl Render for AppView {
                                 if let Some(icon) = icon {
                                     btn = btn.child(img(icon).w(px(14.0)).h(px(14.0)));
                                 }
-                                btn.child("Programme")
+                                btn.child(t("topbar.programme.label"))
                             })
                             // Chat toggle — show/hide the right sidebar.
                             // Same place + behaviour as the web's chat-toggle.
@@ -1750,13 +1751,13 @@ impl Render for AppView {
                             div()
                                 .text_color(rgb(0xef4444))
                                 .font_weight(FontWeight::SEMIBOLD)
-                                .child("Serveur indisponible"),
+                                .child(t("status.server_down")),
                         )
                         .child(
                             div()
                                 .text_xs()
                                 .text_color(rgb(0x888888))
-                                .child("Connexion au serveur perdue. L'application reprendra automatiquement dès que le serveur sera accessible."),
+                                .child(t("status.server_down_body")),
                         )
                         .occlude(),
                 )

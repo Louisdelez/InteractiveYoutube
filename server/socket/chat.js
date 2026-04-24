@@ -4,6 +4,7 @@ const { redis } = require('../services/redis');
 const log = require('../services/logger');
 const metrics = require('../services/metrics');
 const { generatePseudo, generateColor } = require('../services/pseudo');
+const { t } = require('../i18n/fr');
 
 /**
  * Strip control characters, zero-width spaces and bidirectional
@@ -154,7 +155,7 @@ function registerChatHandlers(io, socket, user) {
     const rateKey = (user && `u:${user.id}`) || `ip:${socket.clientIP || 'unknown'}`;
     try {
       if (await isRateLimited(rateKey)) {
-        socket.emit('chat:error', { error: 'Trop de messages, attends un peu.' });
+        socket.emit('chat:error', { error: t('chat.rate_limit_error') });
         return;
       }
     } catch (err) {
