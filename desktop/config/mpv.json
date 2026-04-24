@@ -1,0 +1,73 @@
+{
+  "_comment": "mpv subprocess profiles. `common` flags apply to both main and backup; `main` / `backup` add instance-specific ones. All keys map to mpv's CLI / property names (`--key=value`). `backup.freeze` / `backup.thaw` are runtime-settable subsets applied when a backup mpv is parked off-screen or revealed again. Modify here (no Rust change needed) to tune cache sizes / decoder options / ytdl-format selection — recompile required since values are baked in via include_str!.",
+
+  "common": {
+    "ytdl": "yes",
+    "osc": "no",
+    "input-vo-keyboard": "no",
+    "force-window": "yes",
+    "keep-open": "no",
+    "hwdec": "auto-safe",
+    "cache": "yes",
+    "vo": "gpu-next"
+  },
+
+  "main": {
+    "cursor-autohide": "no",
+    "volume": 100,
+    "prefetch-playlist": "yes",
+    "cache-secs": 30,
+    "demuxer-readahead-secs": 15,
+    "demuxer-max-bytes": "200MiB",
+    "demuxer-max-back-bytes": "50MiB",
+    "stream-lavf-o": "reconnect=1,reconnect_streamed=1,reconnect_delay_max=5",
+    "cache-pause-initial": "no",
+    "cache-pause-wait": 1.0,
+    "hr-seek": "no",
+    "network-timeout": 10,
+    "video-latency-hacks": "yes",
+    "profile": "fast",
+    "scale": "bilinear",
+    "dscale": "bilinear",
+    "cscale": "bilinear",
+    "sigmoid-upscaling": "no",
+    "correct-downscaling": "no",
+    "linear-downscaling": "no",
+    "deband": "no",
+    "dither-depth": "auto",
+    "target-colorspace-hint": "no",
+    "tone-mapping": "auto",
+    "gamut-mapping-mode": "auto",
+    "video-sync": "audio",
+    "interpolation": "no",
+    "sub-visibility": "no",
+    "sub-auto": "all",
+    "ytdl-raw-options": "sub-langs=all,write-auto-subs=,write-subs="
+  },
+
+  "backup": {
+    "ytdl-format": "worst[height<=360][vcodec!*=av01]/worst[vcodec!*=av01]/worst",
+    "mute": "yes",
+    "volume": 100,
+    "cache-secs": 10,
+    "demuxer-readahead-secs": 6,
+    "demuxer-max-bytes": "40MiB",
+    "demuxer-max-back-bytes": "10MiB"
+  },
+
+  "backup_freeze": {
+    "mute": true,
+    "cache-secs": 5,
+    "demuxer-readahead-secs": 5,
+    "demuxer-max-bytes": 20971520,
+    "demuxer-max-back-bytes": 5242880
+  },
+
+  "backup_thaw": {
+    "mute": false,
+    "cache-secs": 10,
+    "demuxer-readahead-secs": 6,
+    "demuxer-max-bytes": 41943040,
+    "demuxer-max-back-bytes": 10485760
+  }
+}

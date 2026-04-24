@@ -98,43 +98,15 @@ impl BackupPlayer {
             (xlib.XClearWindow)(display, window);
             (xlib.XFlush)(display);
 
-            // All options passed as CLI flags so they're applied at
-            // mpv boot before the first loadfile. Runtime-settable
-            // properties (cache-secs, mute, etc.) could also be set
-            // via `MpvIpcClient::set_property` post-spawn, but keeping
-            // everything in argv makes the mpv process inspectable
-            // with `ps auxf` for debugging.
-            let wid_flag = format!("--wid={}", window);
-            let flags: Vec<&str> = vec![
-                &wid_flag,
-                "--ytdl=yes",
-                // Cheapest stream: smallest height, lowest bitrate, audio
-                // included where possible. **Exclude AV1** — YouTube
-                // increasingly serves AV1 but GPUs older than Ampere
-                // (RTX 30-series) have no NVDEC AV1, so mpv falls back
-                // to `dav1d` software decode and eats ~30 % CPU even
-                // on a 360p stream.
-                "--ytdl-format=worst[height<=360][vcodec!*=av01]/worst[vcodec!*=av01]/worst",
-                "--osc=no",
-                "--input-vo-keyboard=no",
-                "--force-window=yes",
-                "--keep-open=no",
-                "--hwdec=auto-safe",
-                "--cache=yes",
-                // Backup is the *low-quality* preview, loaded in parallel
-                // with main for fast-first-frame. Typically live on
-                // screen for only ~3 s before the swap-up to main, so
-                // the 30 s default cache is overkill. 10 s of readahead
-                // is the sweet spot — smaller and mpv loops on segment-
-                // refetching (HLS chunks are 5-10 s).
-                "--cache-secs=10",
-                "--demuxer-readahead-secs=6",
-                "--demuxer-max-bytes=40MiB",
-                "--demuxer-max-back-bytes=10MiB",
-                "--vo=gpu-next",
-                "--mute=yes",
-                "--volume=100",
-            ];
+            // Flags come from `desktop/config/mpv.json` via
+            // `services::mpv_profiles::backup_flags()`. The backup
+            // section carries the low-quality `ytdl-format` (with AV1
+            // excluded — see comment in the JSON) and the aggressive
+            // cache sizes needed for the short-lived preview stream.
+            let mut owned_flags: Vec<String> =
+                crate::services::mpv_profiles::backup_flags();
+            owned_flags.insert(0, format!("--wid={}", window));
+            let flags: Vec<&str> = owned_flags.iter().map(|s| s.as_str()).collect();
             let mpv = MpvIpcClient::spawn(&flags).ok()?;
 
             Some(BackupPlayer {
@@ -233,24 +205,22 @@ impl BackupPlayer {
             (self.xlib.XFlush)(self.display);
         }
         self.visible = false;
-        let _ = self.mpv.set_property("mute", true);
-        // Shrink the demuxer while parked. 5 s of readahead is enough
-        // to cover a small network blip if the user zaps back,
-        // without forcing mpv into a re-fetch loop (HLS segments
-        // are ~5-10 s each).
-        let _ = self.mpv.set_property("cache-secs", 5i64);
-        let _ = self.mpv.set_property("demuxer-readahead-secs", 5i64);
-        let _ = self.mpv.set_property("demuxer-max-bytes", 20 * 1024 * 1024i64);
-        let _ = self.mpv.set_property("demuxer-max-back-bytes", 5 * 1024 * 1024i64);
+        // Freeze/thaw property sets come from the `backup_freeze` /
+        // `backup_thaw` sections of `desktop/config/mpv.json`. The
+        // parked mpv shrinks its demuxer (5 s readahead, 20 MiB
+        // budget) so a cached channel doesn't keep pulling HLS
+        // segments. Any smaller = re-fetch loops (chunks are 5-10 s).
+        for (k, v) in crate::services::mpv_profiles::backup_freeze_props() {
+            let _ = self.mpv.set_property(&k, &v);
+        }
     }
 
-    /// Thaw: unmute + restore the full demuxer cache.
+    /// Thaw: unmute + restore the full demuxer cache from the
+    /// `backup_thaw` profile.
     pub fn thaw(&mut self) {
-        let _ = self.mpv.set_property("mute", false);
-        let _ = self.mpv.set_property("cache-secs", 10i64);
-        let _ = self.mpv.set_property("demuxer-readahead-secs", 6i64);
-        let _ = self.mpv.set_property("demuxer-max-bytes", 40 * 1024 * 1024i64);
-        let _ = self.mpv.set_property("demuxer-max-back-bytes", 10 * 1024 * 1024i64);
+        for (k, v) in crate::services::mpv_profiles::backup_thaw_props() {
+            let _ = self.mpv.set_property(&k, &v);
+        }
     }
 
     /// What channel YouTube videoId this backup is currently loaded

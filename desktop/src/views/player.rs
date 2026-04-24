@@ -527,89 +527,25 @@ impl PlayerView {
                 w
             };
 
-            // Phase 3 of the external-mpv refactor: main is now also a
-            // subprocess controlled via JSON IPC. All init options move
-            // from `Mpv::with_initializer` callbacks to CLI flags (same
-            // semantics, one source of truth inspectable with `ps auxf`).
+            // Phase 3 of the external-mpv refactor: main runs as a
+            // subprocess controlled via JSON IPC. The ~40 flags below
+            // used to be a hardcoded Vec<&str> here; they now live in
+            // `desktop/config/mpv.json` and are surfaced via
+            // `services::mpv_profiles::main_flags()`. See that file
+            // to tune cache sizes / scaler picks / ytdl options.
             let _ = bundled_shader_paths;
-            let wid_flag = format!("--wid={}", child_window);
-            let ytdl_format_flag = format!("--ytdl-format={}", QUALITIES[0].1);
             let ytdl_path = crate::services::ytdlp_updater::binary_path();
-            let script_opts_flag = if ytdl_path.exists() {
-                Some(format!(
+            let mut owned_flags: Vec<String> =
+                crate::services::mpv_profiles::main_flags();
+            owned_flags.insert(0, format!("--wid={}", child_window));
+            owned_flags.push(format!("--ytdl-format={}", QUALITIES[0].1));
+            if ytdl_path.exists() {
+                owned_flags.push(format!(
                     "--script-opts=ytdl_hook-ytdl_path={}",
                     ytdl_path.display()
-                ))
-            } else {
-                None
-            };
-            let mut flags: Vec<&str> = vec![
-                &wid_flag,
-                "--ytdl=yes",
-                &ytdl_format_flag,
-                "--osc=no",
-                "--input-vo-keyboard=no",
-                "--cursor-autohide=no",
-                "--force-window=yes",
-                "--keep-open=no",
-                "--hwdec=auto-safe",
-                "--volume=100",
-                // Gap-free transitions: `loadfile <next> append-play`
-                // pre-demuxes the next video silently so EOF → next is
-                // instant.
-                "--prefetch-playlist=yes",
-                "--cache=yes",
-                // Cache sizing: trades memory / threads vs. blip
-                // resistance. 30 s readahead survives a 30 s blip on
-                // a single video and keeps demux thread count in check.
-                "--cache-secs=30",
-                "--demuxer-readahead-secs=15",
-                "--demuxer-max-bytes=200MiB",
-                "--demuxer-max-back-bytes=50MiB",
-                "--stream-lavf-o=reconnect=1,reconnect_streamed=1,reconnect_delay_max=5",
-                // Start as soon as one frame is decodable; don't pause
-                // to fill the full cache. -500 ms perceived startup.
-                "--cache-pause-initial=no",
-                "--cache-pause-wait=1.0",
-                // Keyframe-only seek on swap: no decoder flush, no
-                // black flash. The drift-aware swap logic masks the
-                // small position imprecision.
-                "--hr-seek=no",
-                "--network-timeout=10",
-                // gpu-next VRR/swap-chain hacks shave ~1 vsync latency.
-                "--video-latency-hacks=yes",
-
-                // ── "Browser-like" rendering ──────────────────────────
-                // Match Chrome's <video>: no sharpening, no tone mapping,
-                // no gamut clipping, no frame interpolation. "Decode
-                // and display, add nothing."
-                "--vo=gpu-next",
-                "--profile=fast",
-                "--scale=bilinear",
-                "--dscale=bilinear",
-                "--cscale=bilinear",
-                "--sigmoid-upscaling=no",
-                "--correct-downscaling=no",
-                "--linear-downscaling=no",
-                "--deband=no",
-                "--dither-depth=auto",
-                "--target-colorspace-hint=no",
-                "--tone-mapping=auto",
-                "--gamut-mapping-mode=auto",
-                "--video-sync=audio",
-                "--interpolation=no",
-                "--sub-visibility=no",
-                "--sub-auto=all",
-                // YouTube exposes ~200 auto-translated subtitle tracks;
-                // grab them all via the hook, filter at display time
-                // (see `list_sub_tracks`). Commas are the value
-                // separator for mpv's ytdl-raw-options — we pass a
-                // single wildcard token.
-                "--ytdl-raw-options=sub-langs=all,write-auto-subs=,write-subs=",
-            ];
-            if let Some(ref s) = script_opts_flag {
-                flags.push(s);
+                ));
             }
+            let flags: Vec<&str> = owned_flags.iter().map(|s| s.as_str()).collect();
             let mpv = MpvIpcClient::spawn(&flags).expect("Failed to spawn mpv subprocess");
 
             // No `loadfile` at startup — server is the source of truth.

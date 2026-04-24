@@ -3,6 +3,7 @@ pub mod websocket;
 pub mod emoji_data;
 pub mod logger;
 pub mod mpv_ipc;
+pub mod mpv_profiles;
 pub mod pseudo;
 pub mod settings;
 pub mod state_cache;
