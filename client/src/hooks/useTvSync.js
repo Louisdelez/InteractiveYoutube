@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import socket from '../services/socket';
 import { api } from '../services/api';
+import { log } from '../services/logger';
 
 const PING_COUNT = 5;
 // Sec d'écart toléré avant un re-seek. Sweet-spot pour l'iframe YouTube :
@@ -83,7 +84,7 @@ export function useTvSync(channelId) {
       })
       .catch((err) => {
         if (err.name !== 'AbortError') {
-          console.error('[TV] Failed to fetch state:', err);
+          log.error('tv: failed to fetch state', { err: err.message });
           setIsLoading(false);
         }
       });

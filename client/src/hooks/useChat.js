@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import socket from '../services/socket';
 import { getOrCreatePseudo, getOrCreateColor } from '../utils/pseudoGenerator';
+import { log } from '../services/logger';
 
 const MAX_MESSAGES = 300;
 
@@ -64,7 +65,7 @@ export function useChat(channelId) {
     }
 
     function onChatError({ error }) {
-      console.warn('[Chat]', error);
+      log.warn('chat error', { error });
     }
 
     function onCleared() {
