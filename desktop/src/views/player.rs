@@ -67,15 +67,17 @@ use crate::theme::colors::{
 };
 use crate::theme::layout::{CHAT_W, CONTROL_BAR_H, INFOBAR_H, SIDEBAR_W, TOPBAR_H};
 
-const ICON_PX: u32 = 20;
-
-// Helpers moved to `views/player_util.rs` so unit tests can compile
-// without triggering an rustc SIGSEGV on the 2300-LOC player.rs
-// (GPUI macro expansion depth). Re-exported here as free functions
-// via `use` so the rest of this file keeps its existing call sites.
+// Pure helpers (URL parse, date format, lang name, shader path,
+// quality log) live in `views/player_util.rs`. GPUI widget primitives
+// (fade_volume, loading_indicator, icon_button, icon_label_button) live
+// in `views/player_widgets.rs`. Both splits carve non-PlayerView-state
+// code out of this file so it stays focused on player state + render.
 use super::player_util::{
     bundled_shader_paths, extract_video_id, format_published_tooltip,
     lang_display_name, log_quality, open_in_browser,
+};
+use super::player_widgets::{
+    fade_volume, icon_button, icon_label_button, loading_indicator, ICON_PX,
 };
 
 /// Five "default" subtitle languages shown in the captions popup.
@@ -1987,147 +1989,4 @@ impl Render for PlayerView {
                 bar
             })
     }
-}
-
-/// Custom loading indicator: a violet circle whose opacity pulses, plus
-/// a "Chargement…" label below. GPUI's `Div` only supports opacity in
-/// animations (rotation is reserved for `Icon`/`Svg`), so we go with a
-/// pulsing dot — clearly visible against the black background.
-/// Linear volume ramp over `total_ms` on a shared mpv handle.
-/// Replaces the audible-pop `set("mute", true)` toggle on swap with a
-/// short crossfade. Spawned on GPUI's executor so it doesn't block the
-/// poll loop. Steps every 16 ms (~60 Hz vsync) to stay smooth. Post-
-/// Phase-3: both main and backup are IPC-controlled so this is the
-/// only variant — no more libmpv2.
-fn fade_volume<T: 'static>(
-    mpv: crate::services::mpv_ipc::MpvIpcClient,
-    from: i64,
-    to: i64,
-    total_ms: u64,
-    cx: &mut Context<T>,
-) {
-    let start = std::time::Instant::now();
-    let total = std::time::Duration::from_millis(total_ms);
-    cx.spawn(async move |_, cx| {
-        let from_f = from as f64;
-        let to_f = to as f64;
-        loop {
-            let elapsed = start.elapsed();
-            if elapsed >= total {
-                let _ = mpv.set_property("volume", to);
-                break;
-            }
-            let t = elapsed.as_millis() as f64 / total_ms.max(1) as f64;
-            let v = (from_f + (to_f - from_f) * t).round() as i64;
-            let _ = mpv.set_property("volume", v);
-            cx.background_executor()
-                .timer(std::time::Duration::from_millis(16))
-                .await;
-        }
-    })
-    .detach();
-}
-
-fn loading_indicator() -> impl IntoElement {
-    use gpui::{ease_in_out, Animation, AnimationExt as _};
-    div()
-        .flex()
-        .flex_col()
-        .items_center()
-        .justify_center()
-        .gap_3()
-        .child(
-            div()
-                .w(px(36.0))
-                .h(px(36.0))
-                .rounded_full()
-                .bg(rgb(0x9b59b6))
-                .with_animation(
-                    "loading-pulse",
-                    Animation::new(std::time::Duration::from_millis(1100))
-                        .repeat()
-                        .with_easing(ease_in_out),
-                    |this, t| {
-                        // Triangle wave 0 → 1 → 0 mapped to opacity 0.25 → 1.0
-                        let tri = if t < 0.5 { t * 2.0 } else { (1.0 - t) * 2.0 };
-                        this.opacity(0.25 + 0.75 * tri)
-                    },
-                ),
-        )
-        .child(
-            div()
-                .text_xs()
-                .text_color(rgb(0xaaaaaa))
-                .child("Chargement…"),
-        )
-}
-
-fn icon_button(
-    id: &'static str,
-    icon: Option<Arc<Image>>,
-    accent: bool,
-    on_click: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
-) -> impl IntoElement {
-    let mut button = div()
-        .id(id)
-        .flex()
-        .items_center()
-        .justify_center()
-        .w(px(36.0))
-        .h(px(36.0))
-        .rounded(px(6.0))
-        .cursor_pointer()
-        .hover(|this| this.bg(rgb(BTN_HOVER)))
-        .active(|this| this.bg(rgb(BTN_ACTIVE)))
-        .on_click(on_click);
-
-    if accent {
-        button = button.bg(rgb(BTN_ACTIVE));
-    }
-    if let Some(img_handle) = icon {
-        button = button.child(
-            img(img_handle)
-                .w(px(ICON_PX as f32))
-                .h(px(ICON_PX as f32)),
-        );
-    }
-    button
-}
-
-/// Pill-shaped button: 20px icon + 12px label, used for captions/audio/quality.
-fn icon_label_button(
-    id: &'static str,
-    icon: Option<Arc<Image>>,
-    label: &str,
-    accent: bool,
-    on_click: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
-) -> impl IntoElement {
-    let label_color = if accent { ACCENT } else { TEXT_PRIMARY };
-    let mut button = div()
-        .id(id)
-        .flex()
-        .items_center()
-        .gap_2()
-        .px_2()
-        .h(px(36.0))
-        .rounded(px(6.0))
-        .cursor_pointer()
-        .hover(|this| this.bg(rgb(BTN_HOVER)))
-        .active(|this| this.bg(rgb(BTN_ACTIVE)))
-        .on_click(on_click);
-
-    if let Some(img_handle) = icon {
-        button = button.child(
-            img(img_handle)
-                .w(px(ICON_PX as f32))
-                .h(px(ICON_PX as f32)),
-        );
-    }
-    button.child(
-        div()
-            .text_xs()
-            .text_color(rgb(label_color))
-            .font_weight(FontWeight::MEDIUM)
-            .child(label.to_string()),
-    )
 }

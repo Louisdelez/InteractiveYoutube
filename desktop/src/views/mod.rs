@@ -1,6 +1,7 @@
 pub mod sidebar;
 pub mod player;
 pub mod player_util;
+pub mod player_widgets;
 pub mod chat;
 pub mod auth;
 pub mod settings_modal;
