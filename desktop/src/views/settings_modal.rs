@@ -8,6 +8,7 @@
 //! Settings persist locally via `services::settings::save`. When a
 //! user is logged in, AppView also pushes them to the server.
 
+use crate::i18n::t;
 use crate::services::settings::Settings;
 use gpui::*;
 
@@ -84,7 +85,7 @@ impl Render for SettingsModal {
                             .text_sm()
                             .font_weight(FontWeight::SEMIBOLD)
                             .text_color(rgb(0xefeff1))
-                            .child("Paramètres"),
+                            .child(t("settings.title")),
                     )
                     .child(
                         div()
@@ -110,7 +111,7 @@ impl Render for SettingsModal {
                             .text_xs()
                             .font_weight(FontWeight::SEMIBOLD)
                             .text_color(rgb(0xefeff1))
-                            .child("Mémoire — chaînes pré-chargées"),
+                            .child(t("settings.memory.title")),
                     )
                     .child(
                         div()
@@ -180,7 +181,7 @@ impl Render for SettingsModal {
                             .border_color(rgb(0x44181c))
                             .bg(rgb(0x1a0e0f))
                             .hover(|this| this.bg(rgb(0x2a1416)))
-                            .child("Purger maintenant")
+                            .child(t("settings.memory.purge"))
                             .on_click(cx.listener(|_, _, _, cx| {
                                 cx.emit(SettingsEvent::PurgeMemory);
                             })),
@@ -197,7 +198,7 @@ impl Render for SettingsModal {
                             .text_xs()
                             .font_weight(FontWeight::SEMIBOLD)
                             .text_color(rgb(0xefeff1))
-                            .child("Qualité vidéo"),
+                            .child(t("settings.quality.title")),
                     )
                     .child(
                         div()
