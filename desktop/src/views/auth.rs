@@ -6,6 +6,7 @@ use gpui::*;
 use gpui_component::input::{Input, InputState};
 use std::sync::mpsc::{self, Receiver, Sender};
 
+use crate::i18n::t;
 use crate::services::api::{self, User};
 
 #[derive(Clone, Debug)]
@@ -37,9 +38,9 @@ pub struct AuthView {
 
 impl AuthView {
     pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
-        let email = cx.new(|cx| InputState::new(window, cx).placeholder("Email"));
-        let password = cx.new(|cx| InputState::new(window, cx).placeholder("Mot de passe"));
-        let username = cx.new(|cx| InputState::new(window, cx).placeholder("Pseudo"));
+        let email = cx.new(|cx| InputState::new(window, cx).placeholder(t("auth.email.label")));
+        let password = cx.new(|cx| InputState::new(window, cx).placeholder(t("auth.password.label")));
+        let username = cx.new(|cx| InputState::new(window, cx).placeholder(t("auth.username.label")));
 
         let (tx, rx) = mpsc::channel::<Result<User, String>>();
         let rx = std::sync::Arc::new(std::sync::Mutex::new(rx));
@@ -136,9 +137,9 @@ impl Render for AuthView {
                             .font_weight(FontWeight::SEMIBOLD)
                             .text_color(rgb(0xefeff1))
                             .child(if mode == Mode::Login {
-                                "Connexion"
+                                t("auth.login")
                             } else {
-                                "Créer un compte"
+                                t("auth.register")
                             }),
                     )
                     .child(
@@ -185,11 +186,11 @@ impl Render for AuthView {
                     .text_color(rgb(0xffffff))
                     .font_weight(FontWeight::SEMIBOLD)
                     .child(if pending {
-                        "Chargement…"
+                        t("auth.loading")
                     } else if mode == Mode::Login {
-                        "Se connecter"
+                        t("auth.login_confirm")
                     } else {
-                        "Créer le compte"
+                        t("auth.register_confirm")
                     })
                     .on_click(cx.listener(|this, _, _, cx| {
                         this.submit(cx);
@@ -204,9 +205,9 @@ impl Render for AuthView {
                     .cursor_pointer()
                     .hover(|this| this.text_color(rgb(0x9b59b6)))
                     .child(if mode == Mode::Login {
-                        "Pas de compte ? Créer un compte"
+                        t("auth.switch_to_register")
                     } else {
-                        "Déjà un compte ? Se connecter"
+                        t("auth.switch_to_login")
                     })
                     .on_click(cx.listener(|this, _, _, cx| {
                         this.mode = if this.mode == Mode::Login {
