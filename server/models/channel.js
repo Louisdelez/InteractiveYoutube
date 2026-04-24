@@ -193,9 +193,14 @@ class HitsFeedChannel extends Channel {
     return true;
   }
   get detailsOpts() {
-    // Music clips are typically > 1 min; Shorts would be the
-    // occasional 30-s teaser. Filter them out like Normal channels do.
-    return {};
+    // Shorts stay filtered (default) — vertical 30-s teasers aren't
+    // good channel content. Lives are INCLUDED : the YouTube API
+    // often tags fresh music clips with `liveStreamingDetails`
+    // leftover from their Premiere event, and filtering them would
+    // drop ~30 % of chart entries. Upper-bound duration at 15 min
+    // to exclude actual concert recordings / multi-song medleys
+    // that sometimes sneak into the chart via a remix credit.
+    return { skipLiveFilter: true, maxDurationSec: 900 };
   }
   async fetchVideoIds() {
     const deezer = require('../services/deezer');

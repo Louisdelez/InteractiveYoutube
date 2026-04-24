@@ -101,16 +101,30 @@ async function searchMusicVideo(artist, title) {
     if (hit) return hit;
   } catch (_) {}
 
-  // Query : the official-video bias matters a lot — without the
-  // "official" hint, YouTube surfaces fan uploads with lower quality
-  // + bad metadata. "audio" fallback for tracks that never got a
-  // video at all ends up ranked nearly as high by YouTube on its own.
-  const query = `${artist} ${title} official`;
+  // Cascade of query variants. The first that returns a valid ID
+  // wins. Rationale :
+  //   1. "official video" — the canonical clip, best audio+visual.
+  //   2. "official audio" — many tracks ship audio-only first, the
+  //      clip follows weeks later ; this rank-1 result is still
+  //      typically the artist's own upload.
+  //   3. Plain "<artist> <title>" — last resort for remixes /
+  //      features where the "official" bias misses the chart entry.
+  const variants = [
+    `${artist} ${title} official video`,
+    `${artist} ${title} official audio`,
+    `${artist} ${title}`,
+  ];
   let videoId = null;
-  try {
-    videoId = await spawnYtdlpSearch(query);
-  } catch (err) {
-    log.warn({ artist, title, err: err.message }, 'music-search: failed');
+  for (const q of variants) {
+    try {
+      videoId = await spawnYtdlpSearch(q);
+      if (videoId) break;
+    } catch (err) {
+      log.debug({ artist, title, variant: q, err: err.message }, 'music-search: variant failed');
+    }
+  }
+  if (!videoId) {
+    log.warn({ artist, title }, 'music-search: all variants failed');
   }
 
   try {

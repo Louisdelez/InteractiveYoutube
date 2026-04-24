@@ -206,11 +206,22 @@ async function fetchVideoDetails(videoIds, options = {}) {
       const isLive = !!item.liveStreamingDetails;
       const isLiveNow = item.snippet.liveBroadcastContent === 'live' || item.snippet.liveBroadcastContent === 'upcoming';
 
-      // Skip: duration 0, live streams and live replays
-      // Include non-embeddable videos with a flag (for Tauri app support)
-      // skipLiveFilter: for curated/fixed playlists where lives are intentionally included
+      // Skip: duration 0, live streams and live replays.
+      // Include non-embeddable videos with a flag (for Tauri app support).
+      // skipLiveFilter: for curated/fixed playlists where lives are
+      // intentionally included (Popcorn specials, fixed-video Noob
+      // clips, AND the Hits du Moment channel — YouTube Premieres
+      // on fresh music clips leave `liveStreamingDetails` attached
+      // even after the premiere ends, so they'd be dropped despite
+      // being a regular on-demand clip).
       const filterLive = !options.skipLiveFilter && (isLive || isLiveNow);
-      if (duration > 0 && !filterLive) {
+      // Optional upper bound — when skipLiveFilter is true we still
+      // don't want a 2 h live concert recording in a singles-focused
+      // channel. Hits du Moment passes 900 (15 min) ; long-form
+      // channels leave it undefined (no cap).
+      const tooLong =
+        typeof options.maxDurationSec === 'number' && duration > options.maxDurationSec;
+      if (duration > 0 && !filterLive && !tooLong) {
         videos.push({
           videoId: item.id,
           title: item.snippet.title,
@@ -218,7 +229,7 @@ async function fetchVideoDetails(videoIds, options = {}) {
           embeddable: !!item.status.embeddable,
           publishedAt: item.snippet.publishedAt || null,
         });
-      } else if (isLive) {
+      } else if (isLive && filterLive) {
         livesFiltered++;
       }
     }
