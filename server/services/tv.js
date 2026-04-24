@@ -1,5 +1,6 @@
 const { getPlaylist } = require('./playlist');
 const log = require('./logger').child({ component: 'tv' });
+const urlResolver = require('./url-resolver');
 
 // Per-channel cache and priority queues
 const channelCache = new Map(); // channelId -> { state, cachedAt }
@@ -15,7 +16,36 @@ function queuePriorityVideo(channelId, video) {
   if (queue.some((v) => v.videoId === video.videoId)) return;
   queue.push(video);
   channelCache.delete(channelId);
+  // Drop the cached resolved URL for this channel — it belongs to the
+  // previous video and would ship the wrong stream to clients. The
+  // next url-resolver sweep will re-populate it for the new videoId.
+  urlResolver.invalidate(channelId).catch(() => {});
   log.info({ channelId, title: video.title }, 'priority queued');
+}
+
+/**
+ * Merge the Redis-cached pre-resolved URLs into a tv:state payload.
+ * Cache is only applied if the cached videoId matches `state.videoId`
+ * exactly — protects against serving a URL from the previous video
+ * after an auto-advance or priority injection.
+ *
+ * Stays best-effort: any Redis error just returns `state` unchanged
+ * and lets mpv fall back to its normal ytdl_hook path.
+ */
+async function enrichWithResolvedUrl(state) {
+  if (!state || !state.videoId) return state;
+  try {
+    const cached = await urlResolver.getCached(state.channelId, state.videoId);
+    if (!cached) return state;
+    return {
+      ...state,
+      resolvedUrl: cached.mainUrl || undefined,
+      resolvedUrlLq: cached.lqUrl || undefined,
+      resolvedAt: cached.resolvedAt,
+    };
+  } catch (_) {
+    return state;
+  }
 }
 
 function getTvState(channelId) {
@@ -168,4 +198,4 @@ function getTvState(channelId) {
   return { ...state, serverTime: now };
 }
 
-module.exports = { getTvState, queuePriorityVideo };
+module.exports = { getTvState, queuePriorityVideo, enrichWithResolvedUrl };

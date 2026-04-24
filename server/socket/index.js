@@ -4,7 +4,7 @@ const jwt = require('jsonwebtoken');
 const config = require('../config');
 const { redisPub, redisSub, redis } = require('../services/redis');
 const { registerTvHandlers, startSyncBroadcast, stopSyncBroadcast } = require('./tv');
-const { getTvState } = require('../services/tv');
+const { getTvState, enrichWithResolvedUrl } = require('../services/tv');
 const { registerChatHandlers, stopBatching, getHistory } = require('./chat');
 const { findUserById } = require('../db');
 const log = require('../services/logger');
@@ -182,7 +182,9 @@ function setupSocketIO(httpServer) {
     // which desynced the client (see comment in tv.js).
     const initialState = getTvState(defaultChannel);
     if (initialState) {
-      socket.emit('tv:state', initialState);
+      enrichWithResolvedUrl(initialState)
+        .then((enriched) => socket.emit('tv:state', enriched))
+        .catch(() => socket.emit('tv:state', initialState));
     }
     // Send chat history for the same channel (was hardcoded to
     // CHANNELS[0] in chat.js — same Amixem bug).

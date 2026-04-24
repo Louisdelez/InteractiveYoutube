@@ -188,11 +188,20 @@ impl PlayerView {
             {
                 if !took_from_cache {
                     if let Some(b) = self.backup.as_mut() {
-                        b.load(&url, state.seek_to);
+                        // Prefer the server-pre-resolved LQ URL when
+                        // fresh — lets mpv skip the yt-dlp step
+                        // entirely on the backup (~200-400 ms saved on
+                        // cold first-frame).
+                        let backup_resolved = state
+                            .resolved_url_lq
+                            .as_deref()
+                            .filter(|s| !s.is_empty() && state.resolved_url_is_fresh());
+                        b.load(&url, backup_resolved, state.seek_to);
                         self.pending_backup_reveal = true;
                         log_quality(&format!(
-                            "channel/video switch → backup loading {} (parallel main load)",
-                            state.video_id
+                            "channel/video switch → backup loading {} (resolved={}, parallel main load)",
+                            state.video_id,
+                            backup_resolved.is_some()
                         ));
                     }
                 }
@@ -237,7 +246,24 @@ impl PlayerView {
                         "main set start",
                         state.seek_to
                     );
-                    mpv_try!(mpv.command("loadfile", &[&url]), "main loadfile", &url);
+                    // Pre-resolved URL path: skip yt-dlp entirely by
+                    // handing mpv the final googlevideo URL the
+                    // server's url-resolver cached for us. Huge cold-
+                    // zap win (~200-800 ms off first-frame). Falls
+                    // back to the youtube.com URL + ytdl_hook when
+                    // the URL is absent or stale.
+                    let main_resolved = state
+                        .resolved_url
+                        .as_deref()
+                        .filter(|s| !s.is_empty() && state.resolved_url_is_fresh());
+                    let chosen = main_resolved.unwrap_or(url.as_str());
+                    let ytdl_on = main_resolved.is_none();
+                    mpv_try!(mpv.set_property("ytdl", ytdl_on), "main set ytdl", ytdl_on);
+                    mpv_try!(mpv.command("loadfile", &[chosen]), "main loadfile", chosen);
+                    log_quality(&format!(
+                        "main loadfile {} (resolved={})",
+                        state.video_id, main_resolved.is_some()
+                    ));
                 }
             }
         }
@@ -288,7 +314,13 @@ impl PlayerView {
             let url = format!("https://www.youtube.com/watch?v={}", video_id);
             // Make sure the backup is hidden + muted while main plays.
             b.hide();
-            b.load(&url, 0.0);
+            // attach_backup_quality runs on auto-advance (new videoId
+            // mid-channel). No pre-resolved URL is available here
+            // because the server cache is keyed on channelId and the
+            // sweep only touches "current" videos — auto-advance
+            // happens faster than a sweep cycle. Fall back to
+            // ytdl_hook.
+            b.load(&url, None, 0.0);
             log_quality(&format!("backup mpv loading {}", video_id));
         }
     }
@@ -349,7 +381,14 @@ impl PlayerView {
             backup.set_geometry(-10000, -10000, w.max(1), h.max(1));
             let _ = (x, y); // not used for off-screen preload
         }
-        backup.load(url, seek_to);
+        // preload_channel fires from hover → no tv:state round-trip
+        // yet, so we haven't seen a resolvedUrl for this channel.
+        // Ship ytdl_hook; it's fine because this runs in the background
+        // and the user won't watch the result until they click (at
+        // which point the freshly cached URL, if any, would be used
+        // via the load_state path — but freeze is about parking the
+        // demuxer, not the URL).
+        backup.load(url, None, seek_to);
         backup.freeze();
         self.memory_cache.push(MemorizedChannel {
             channel_id: channel_id.to_string(),

@@ -1,17 +1,17 @@
 const express = require('express');
 const config = require('../config');
-const { getTvState } = require('../services/tv');
+const { getTvState, enrichWithResolvedUrl } = require('../services/tv');
 const { getPlaylist } = require('../services/playlist');
 
 const router = express.Router();
 
-router.get('/state', (req, res) => {
+router.get('/state', async (req, res) => {
   const channelId = req.query.channel || config.CHANNELS[0].id;
   const state = getTvState(channelId);
   if (!state) {
     return res.status(503).json({ error: 'Playlist not ready' });
   }
-  res.json(state);
+  res.json(await enrichWithResolvedUrl(state));
 });
 
 router.get('/channels', (req, res) => {

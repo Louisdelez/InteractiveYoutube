@@ -19,10 +19,12 @@ const { initAllPlaylists } = require('../services/playlist');
 const ytdlpUpdater = require('../services/ytdlp-updater');
 const dailyMaintenance = require('./daily-maintenance');
 const rssPoll = require('./rss-poll');
+const urlResolver = require('./url-resolver');
 
 async function shutdown(signal) {
   log.info({ signal }, 'worker shutting down');
   rssPoll.stop();
+  urlResolver.stop();
   ytdlpUpdater.stop();
   // BullMQ workers/queues hold their own Redis sockets; letting the
   // process exit cleanly is enough — BullMQ's internal locks will
@@ -53,6 +55,7 @@ async function start() {
 
     await dailyMaintenance.start();
     rssPoll.start();
+    urlResolver.start();
 
     log.info('worker: ready');
   } catch (err) {

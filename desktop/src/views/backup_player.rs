@@ -124,21 +124,37 @@ impl BackupPlayer {
     }
 
     /// Load a new URL and immediately start (muted, hidden) decoding.
-    pub fn load(&mut self, youtube_url: &str, seek_to: f64) {
-        if self.current_url.as_deref() == Some(youtube_url) {
+    ///
+    /// Prefers `resolved_url` when present (a pre-resolved googlevideo
+    /// URL from the server's url-resolver cache). Toggles `ytdl=no` on
+    /// the fly for that loadfile so mpv doesn't re-spawn yt-dlp when
+    /// we already hand it the final streaming URL. Falls back to the
+    /// youtube.com/watch URL (ytdl=yes path) if resolved is missing.
+    pub fn load(&mut self, youtube_url: &str, resolved_url: Option<&str>, seek_to: f64) {
+        let chosen = resolved_url.unwrap_or(youtube_url);
+        if self.current_url.as_deref() == Some(chosen) {
             // Same URL — just resync.
             if seek_to > 0.5 {
                 self.seek(seek_to);
             }
             return;
         }
-        self.current_url = Some(youtube_url.to_string());
+        self.current_url = Some(chosen.to_string());
         self.first_frame_ready = false;
         // Drain stale events from the previous file BEFORE loadfile.
         // Draining after would also consume the new file's own
         // VIDEO_RECONFIG event when it arrives quickly, making
         // `poll_first_frame_ready` return false forever.
         while self.mpv.wait_event(0.0).is_some() {}
+        // ytdl=no when we pass a pre-resolved URL, yes when we fall
+        // back to youtube.com/watch. Set for EVERY loadfile because
+        // the previous call might have left the opposite value.
+        let ytdl_on = resolved_url.is_none();
+        mpv_try!(
+            self.mpv.set_property("ytdl", ytdl_on),
+            "backup set ytdl",
+            ytdl_on
+        );
         if seek_to > 0.5 {
             mpv_try!(
                 self.mpv.set_property("start", format!("+{}", seek_to)),
@@ -147,9 +163,9 @@ impl BackupPlayer {
             );
         }
         mpv_try!(
-            self.mpv.command("loadfile", &[youtube_url]),
+            self.mpv.command("loadfile", &[chosen]),
             "backup loadfile",
-            youtube_url
+            chosen
         );
     }
 

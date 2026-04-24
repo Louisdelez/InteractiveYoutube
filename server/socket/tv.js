@@ -1,4 +1,4 @@
-const { getTvState } = require('../services/tv');
+const { getTvState, enrichWithResolvedUrl } = require('../services/tv');
 const config = require('../config');
 const metrics = require('../services/metrics');
 const log = require('../services/logger').child({ component: 'socket:tv' });
@@ -29,19 +29,19 @@ function registerTvHandlers(io, socket) {
   // On switch, push the new channel's state. socket/index.js has
   // already (or will momentarily) updated `socket.currentChannel`
   // and the room membership.
-  socket.on('tv:switchChannel', (channelId) => {
+  socket.on('tv:switchChannel', async (channelId) => {
     if (typeof channelId !== 'string') return;
     if (!config.CHANNELS.some((c) => c.id === channelId)) return;
     const state = getTvState(channelId);
     if (state) {
-      socket.emit('tv:state', state);
+      socket.emit('tv:state', await enrichWithResolvedUrl(state));
     }
   });
 
-  socket.on('tv:requestState', () => {
+  socket.on('tv:requestState', async () => {
     const state = getTvState(socket.currentChannel || defaultChannel);
     if (state) {
-      socket.emit('tv:state', state);
+      socket.emit('tv:state', await enrichWithResolvedUrl(state));
     }
   });
 
