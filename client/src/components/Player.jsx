@@ -3,6 +3,7 @@ import YouTube from 'react-youtube';
 import { Play } from 'lucide-react';
 import { useTvSync } from '../hooks/useTvSync';
 import { isTauri } from '../services/platform';
+import { t } from '../i18n';
 import VolumeControl from './VolumeControl';
 import CaptionsControl from './CaptionsControl';
 import PlayerFallback from './PlayerFallback';
@@ -123,7 +124,7 @@ export default function Player({ channelId, channelMeta, isFavorite, onToggleFav
   if (isLoading) {
     return (
       <div className="player-container">
-        <div className="player-loading">Chargement de la TV...</div>
+        <div className="player-loading">{t("player.loading")}</div>
       </div>
     );
   }
@@ -131,7 +132,7 @@ export default function Player({ channelId, channelMeta, isFavorite, onToggleFav
   if (!tvState) {
     return (
       <div className="player-container">
-        <div className="player-loading">Playlist non disponible</div>
+        <div className="player-loading">{t("player.playlist_unavailable")}</div>
       </div>
     );
   }
@@ -234,7 +235,7 @@ export default function Player({ channelId, channelMeta, isFavorite, onToggleFav
         />
         <div className="player-blocker" />
         {!isPlaying && (
-          <button className="play-btn" onClick={handlePlay} title="Lancer la lecture">
+          <button className="play-btn" onClick={handlePlay} title={t("player.start_playback")}>
             <Play size={18} fill="white" />
           </button>
         )}

@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { SmilePlus } from 'lucide-react';
 import { useChat } from '../hooks/useChat';
+import { t } from '../i18n';
 import ChatMessage from './ChatMessage';
 import ChatPicker from './ChatPicker';
 import ViewerCount from './ViewerCount';
@@ -45,7 +46,7 @@ export default function Chat({ channelId }) {
   return (
     <div className="chat-container">
       <div className="chat-header">
-        <h3>Chat en direct</h3>
+        <h3>{t("chat.title")}</h3>
         <ViewerCount count={viewerCount} />
       </div>
 
@@ -55,7 +56,7 @@ export default function Chat({ channelId }) {
         onScroll={handleScroll}
       >
         {messages.length === 0 ? (
-          <div className="chat-empty">Pas encore de messages. Dis quelque chose !</div>
+          <div className="chat-empty">{t("chat.empty")}</div>
         ) : (
           <div
             style={{
@@ -92,7 +93,7 @@ export default function Chat({ channelId }) {
             virtualizer.scrollToIndex(messages.length - 1, { align: 'end' });
           }}
         >
-          Nouveaux messages
+          {t("chat.new_messages")}
         </button>
       )}
 
@@ -124,7 +125,7 @@ export default function Chat({ channelId }) {
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Envoyer un message..."
+            placeholder={t("chat.placeholder")}
             className="chat-input"
             maxLength={500}
           />

@@ -25,6 +25,7 @@
 
   "player.loading": "Chargement de la TV…",
   "player.playlist_unavailable": "Playlist non disponible",
+  "player.start_playback": "Lancer la lecture",
   "player.watch_on_youtube": "Voir sur YouTube",
   "player.auto_advance": "Auto",
   "player.captions_off": "Off",
