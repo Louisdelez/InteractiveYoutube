@@ -2,7 +2,7 @@
 
 Vite + React 19 + Socket.IO client. Optional Tauri shell for a native desktop window that embeds a proper YouTube webview (see `client/src-tauri/`).
 
-> Not to be confused with the **main desktop app** in `/desktop` (Rust + GPUI + libmpv). The Tauri shell is a thin wrapper around this same React code; the Rust desktop app is a full rewrite with its own libmpv pipeline.
+> Not to be confused with the **main desktop app** in `/desktop` (Rust + GPUI + two external mpv subprocesses via JSON IPC). The Tauri shell is a thin wrapper around this same React code ; the Rust desktop app is a full rewrite with its own mpv IPC pipeline. See [DESKTOP.md](DESKTOP.md).
 
 ## Entry
 
@@ -151,7 +151,7 @@ npm run preview       # serves the production bundle locally
 npm run lint          # ESLint on .jsx/.js
 ```
 
-`vite.config.js` sets the dev proxy:
+`vite.config.js` sets the dev proxy :
 
 ```js
 server: {
@@ -165,6 +165,39 @@ server: {
 
 In production the React bundle is served by nginx from `client/dist/`, and `/api/*` + `/socket.io/*` are proxied to the Node cluster on `:4500`.
 
+## i18n
+
+Strings are externalised to `shared/i18n/fr.json`, consumed by **four parallel lookup helpers** (one per stack) so the same key tree works everywhere :
+
+| Stack | Helper | API |
+|---|---|---|
+| Web (this) | `client/src/i18n/index.js` | `t('key')` / `t('key', { name: 'Alice' })` |
+| Status app | `status-app/src/i18n.js` | same API, shares the bundle |
+| Desktop Rust | `desktop/src/i18n/mod.rs` | `t("key")` → `String` / `t_args("key", &[("name","Alice")])` |
+| Node server | `server/i18n/fr.js` | `t('key')` |
+
+Interpolation : `{name}` placeholders are substituted via `value.replace(/\{(\w+)\}/g, …)`. Missing keys log once per key and return the key itself — broken translations are visible in the UI rather than crashing.
+
+Key naming convention : `<scope>.<feature>.<variant>` (examples : `chat.send`, `topbar.search.placeholder`, `status.banner.all_operational`, `date.ago.years_plural`).
+
+Semantic literals stay in code (native-language labels `"Français"`, `"日本語"`, pseudo animal names, proper-noun tab labels `"Emoji"` / `"GIF"` / `"Stickers"`, resolution labels, Tenor brand attribution, stable JSON error identifiers, brand strings).
+
+## Environment variables (Vite)
+
+Any `VITE_*` prefix is exposed to the client at build time.
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `VITE_API_URL` | `http://localhost:4500` | Server base URL override for packaged builds / staging |
+| `VITE_REPO_URL` | `https://github.com/Louisdelez/KoalaTV` | GitHub link in the top bar + about page |
+| `VITE_REPO_SLUG` | `Louisdelez/KoalaTV` | Download-page release API path |
+| `VITE_STATUS_POLL_MS` | `30000` | StatusPage auto-refresh interval |
+| `VITE_YT_SEEK_DELAY_MS` | `3000` | TauriApp : grace before issuing seek after loadVideo |
+| `VITE_YT_POS_SYNC_MS` | `300` | TauriApp : overlay ↔ webview position-sync tick |
+| `VITE_GIF_SEARCH_DEBOUNCE_MS` | `300` | ChatPicker Tenor search debounce |
+| `VITE_DESKTOP_DOWNLOAD_URL` | GitHub releases | Fallback for PlayerFallback app-install button |
+| `VITE_BRAND_HOME_URL` | `https://koalatv.com` | status-app footer brand link |
+
 ## Tauri shell (optional)
 
 Located at `client/src-tauri/`. Provides Rust-invokable commands:
@@ -175,4 +208,4 @@ Located at `client/src-tauri/`. Provides Rust-invokable commands:
 
 `TauriApp.jsx` drives this from React: a `ResizeObserver` + 300 ms interval keeps the native window aligned with the React player area as the layout changes.
 
-This shell is kept because it's a simpler deliverable than the GPUI rewrite for users who only need the "play non-embeddable videos" feature. The `/desktop` app supersedes it for the full experience.
+This shell is kept because it's a simpler deliverable than the GPUI rewrite for users who only need the "play non-embeddable videos" feature. The `/desktop` app (Rust + GPUI + 2× mpv subprocess via IPC) supersedes it for the full experience : dual-mpv zero-cut playback, memory cache for instant zap on recent channels, per-favorite frame snapshot cache, server-pre-resolved googlevideo URLs for ~100 ms cold-zap first frame.

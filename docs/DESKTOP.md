@@ -1,21 +1,22 @@
 # Desktop app reference
 
-Rust (edition 2021) + [GPUI](https://www.gpui.rs) (Zed's UI framework) + [libmpv2](https://crates.io/crates/libmpv2). Linux-first (X11); the codebase compiles on Windows and macOS via `cfg(target_os = "linux")` gates but the in-window mpv embed and native overlays (popup menus, tooltip, badge, backup player) are Linux-only for now. See [CROSS_PLATFORM.md](CROSS_PLATFORM.md) for the per-platform status and roadmap.
+Rust (edition 2021) + [GPUI](https://www.gpui.rs) (Zed's UI framework) driving **two external mpv subprocesses** controlled over JSON IPC (`--input-ipc-server` + Unix socket). Linux-first (X11) ; the codebase compiles on Windows and macOS via `cfg(target_os = "linux")` gates but the in-window mpv embed and native overlays (popup menus, tooltip, badge, backup player) are Linux-only for now. See [CROSS_PLATFORM.md](CROSS_PLATFORM.md) for the per-platform status and roadmap.
 
 ## Why a native app?
 
-- Browser YouTube iframes forbid some videos (copyright / creator setting). libmpv + yt-dlp plays any public video, so the TV never "skips" on a non-embeddable.
-- Lower overhead than Chromium: a few hundred MB of RSS for 1080p playback vs. Chromium's gigabyte.
+- Browser YouTube iframes forbid some videos (copyright / creator setting). mpv + yt-dlp plays any public video, so the TV never "skips" on a non-embeddable.
+- Lower overhead than Chromium : ~230 MB RSS and ~58 threads for 1080p playback with a live backup stream, vs. a gigabyte for Chromium.
 - Full control over subtitle tracks, audio tracks, quality selection.
 
 ## Entry
 
-`src/main.rs`:
+`src/main.rs` :
 
-1. Spawns the yt-dlp auto-updater daemon thread (downloads / `-U` / sleep 6 h / repeat).
-2. `gpui_platform::application().run(...)` — X11/Wayland backend init.
-3. Forces `ThemeMode::Dark` so all gpui-component widgets use a dark palette.
-4. Opens a 1280×800 window titled "Koala TV" and mounts `AppView` wrapped in `gpui_component::Root`.
+1. Initialises the structured `tracing` logger (`services/logger.rs` — file appender to `$XDG_DATA_HOME/KoalaTV/logs/`).
+2. Spawns the yt-dlp auto-updater daemon thread (downloads / `-U` / sleep 6 h / repeat). Env knobs : `YTDLP_UPDATE_INTERVAL_SECS`, `YTDLP_SPAWN_TIMEOUT_SECS`, `YTDLP_DOWNLOAD_URL`.
+3. `gpui_platform::application().run(...)` — X11/Wayland backend init.
+4. Forces `ThemeMode::Dark` so all gpui-component widgets use a dark palette.
+5. Opens a 1280×800 window titled "Koala TV" and mounts `AppView` wrapped in `gpui_component::Root`.
 
 ## AppView (`src/app.rs`)
 
@@ -51,53 +52,46 @@ Server events arrive on an `mpsc::Receiver<ServerEvent>` polled in an async loop
 - `ViewerCount{count}` → `chat.set_viewer_count(count)`.
 - `Connected` / `Disconnected` → sets a flag that shows a "server unavailable" curtain on the player.
 
-## The mpv embed (`src/views/player.rs`)
+## The mpv embed (`src/views/player.rs` + split sub-modules `views/player/{controls,lifecycle,poll,render,x11_errors}.rs`)
 
-The most delicate piece. A libmpv2 `Mpv` instance renders directly into an X11 child window (`wid=<child_window>`). mpv fetches the stream via yt-dlp (our auto-updated binary).
+The most delicate piece. An `MpvIpcClient` from `services/mpv_ipc.rs` spawns mpv as an external subprocess (`mpv --input-ipc-server=<socket>` + its flags) and communicates over JSON on a Unix domain socket. The subprocess renders directly into an X11 child window passed via the `--wid=<xid>` CLI flag. No libmpv linkage — everything is JSON IPC + CLI flags.
 
-### Initialisation highlights
+The IPC wrapper exposes a `libmpv2`-shaped API (`spawn / set_property / get_property / command / wait_event`) with a dedicated reader thread that demultiplexes async events from command replies (keyed by `request_id`). Measured round-trip latency : p99 < 0.1 ms.
 
-```rust
-init.set_property("wid", child_window as i64)?;
-init.set_property("ytdl", "yes")?;
-init.set_property("ytdl-format", QUALITIES[0].1)?; // Auto
+Socket paths live under `$XDG_RUNTIME_DIR` (fallback `$TMPDIR` → `/tmp`) as `koala-mpv-<pid>-<nanos>.sock`. On `MpvIpcClient::Drop` : SIGTERM → 500 ms grace → SIGKILL → blocking `wait()` → socket file removed.
 
-// Gap-free EOF → next via loadfile append-play
-init.set_property("prefetch-playlist", "yes")?;
-init.set_property("cache", "yes")?;
-init.set_property("cache-secs", 60i64)?;
-init.set_property("demuxer-readahead-secs", 20i64)?;
-init.set_property("demuxer-max-bytes", "200MiB")?;
-init.set_property("stream-lavf-o",
-    "reconnect=1,reconnect_streamed=1,reconnect_delay_max=5")?;
+### Spawn flags (CLI, not init)
 
-// Keyframe-only seek = no decoder flush, no black flash
-init.set_property("hr-seek", "no")?;
-init.set_property("network-timeout", 10i64)?;
+All properties are passed to mpv at spawn time via CLI flags — easy to inspect with `ps auxf`. For the main mpv :
 
-// GPU renderer, browser-like (no sharpening, no tone mapping)
-init.set_property("vo", "gpu-next")?;
-init.set_property("profile", "fast")?;
-init.set_property("scale", "bilinear")?;
-
-// Video-sync/interpolation tuned for VOD (no "soap opera")
-init.set_property("video-sync", "audio")?;
-init.set_property("interpolation", "no")?;
-init.set_property("video-latency-hacks", "yes")?;
-
-// Subtitles: fetch all languages, keep off by default
-init.set_property("sub-visibility", false)?;
-init.set_property("sub-auto", "all")?;
-init.set_property("ytdl-raw-options",
-    "sub-langs=all,write-auto-subs=,write-subs=")?;
-
-// Use our auto-updated yt-dlp instead of $PATH
-let ytdl_path = crate::services::ytdlp_updater::binary_path();
-if ytdl_path.exists() {
-    init.set_property("script-opts",
-        format!("ytdl_hook-ytdl_path={}", ytdl_path.display()).as_str())?;
-}
 ```
+mpv --idle=yes \
+    --input-ipc-server=<socket> \
+    --no-terminal --no-input-default-bindings \
+    --wid=<child_window_xid> \
+    --ytdl=yes --osc=no --input-vo-keyboard=no \
+    --force-window=yes --keep-open=no --hwdec=auto-safe \
+    --cache=yes --vo=gpu-next --cursor-autohide=no \
+    --volume=100 --prefetch-playlist=yes \
+    --cache-secs=30 --demuxer-readahead-secs=15 \
+    --demuxer-max-bytes=200MiB --demuxer-max-back-bytes=50MiB \
+    --stream-lavf-o=reconnect=1,reconnect_streamed=1,reconnect_delay_max=5 \
+    --cache-pause-initial=no --cache-pause-wait=1.0 \
+    --hr-seek=no --network-timeout=10 --video-latency-hacks=yes \
+    --profile=fast --scale=bilinear --dscale=bilinear --cscale=bilinear \
+    --sigmoid-upscaling=no --correct-downscaling=no --linear-downscaling=no \
+    --deband=no --video-sync=audio --interpolation=no \
+    --sub-visibility=no --sub-auto=all \
+    --ytdl-raw-options=sub-langs=all,write-auto-subs=,write-subs= \
+    --ytdl-format=bestvideo[height<=1080][vcodec!*=av01]+bestaudio/... \
+    --script-opts=ytdl_hook-ytdl_path=<yt-dlp path>
+```
+
+Backup mpv (LQ 360p) adds `--mute=yes` and a lighter `--cache-secs=10` + `--demuxer-max-bytes=40MiB` to keep RAM low while frozen. Quality/audio/subtitle track changes at runtime go through `set_property` over IPC.
+
+### Pre-resolved URL fast path
+
+When the server's url-resolver has a fresh Redis cache entry for the channel's current videoId, `tv:state` carries `resolvedUrl` (HQ progressive / HLS manifest) and `resolvedUrlLq`. `views/player/lifecycle.rs::load_state` picks the resolved URL over the `youtube.com/watch?v=` fallback, toggles `ytdl=no` on mpv for that loadfile, and passes the URL directly. Skips the ~200-800 ms yt-dlp subprocess spawn entirely ; cold-zap first-frame drops from ~300 ms to ~100 ms. Staleness gate : `TvState::resolved_url_is_fresh()` rejects anything > 5 h old (env `KOALA_RESOLVED_URL_MAX_AGE_SECS`).
 
 ### Dual-mpv "zero cut" pattern
 
@@ -119,7 +113,19 @@ This is why you never see a black frame between channels — even on slow networ
 
 ### Channel memory
 
-A small LRU of "frozen" backup mpvs (one per visited channel) is kept in `memory_cache.rs`. Capacity is user-configurable (0 = disabled, default 2). Zapping back to a recent channel reveals its frozen backup instantly while the main reloads.
+A small LRU of "frozen" backup mpv subprocesses (one per visited channel) is kept in `memory_cache.rs`. Capacity is user-configurable (0 = disabled, default 2). Zapping back to a recent channel reveals its frozen backup instantly while the main reloads.
+
+### Frame snapshot cache (favorites only)
+
+Client-only feature in `services/frame_cache.rs`. For every favorite channel, the client pre-fetches `https://img.youtube.com/vi/<videoId>/maxresdefault.jpg` (fallback `hqdefault.jpg`) and holds it as `Arc<gpui::Image>` in `AppView::frame_cache`. On click, `subscriptions::channel_click` passes the cached image to `PlayerView::show_snapshot` ; the render path paints it via a GPUI `img()` element in the video area while mpv is held off-screen via `apply_geometry(-10000, …)`. The poll loop clears the snapshot the moment either mpv fires `VideoReconfig` or the backup becomes the visible surface (`pending_backup_reveal`).
+
+Trade-off : the user sees an immediate visual change to the target channel (the video's cover thumbnail, not the exact frame-at-seekTo) instead of the previous channel's frozen last frame — perceived zap = 0 ms. Scoped to favorites because RAM scales linearly (~150 KB decoded × N favorites). Triggers :
+- **Boot** : `background_tasks::state_prefetch` tv:state replies arm `fetch_snapshot` for each favorite.
+- **Session** : `dispatch.rs` tv:sync hook detects videoId changes on favorites → refetch.
+- **Add favorite** : `sync_frame_cache_to_favorites` fetches immediately (videoId already known in `last_state_per_channel`).
+- **Remove favorite** : `FrameCache::evict_non_favorites` drops the Arc.
+
+Zero server involvement ; client talks direct to `img.youtube.com` (same host mpv already resolves).
 
 ### Quality / audio / subtitle menus
 
@@ -131,15 +137,24 @@ This is done natively because GPUI's popovers would render under the mpv X11 win
 
 YouTube's auto-translated subtitles expose ~200 languages. We pass `sub-langs=all` to yt-dlp, but in the UI we show only 5 common languages (fr, en, de, es, it) by default with a "Plus de langues" option to expand.
 
+## Module split
+
+Two big files (`app.rs`, `views/player.rs`) were split into sub-modules to hit a LOC target from the code-quality audit. Same module tree — child files inherit private-field access on the parent struct via `pub(super)`.
+
+| Parent | Children (`<parent>/<name>.rs`) |
+|---|---|
+| `app.rs` (300 LOC) | `fps`, `helpers`, `modals`, `dispatch`, `subscriptions`, `background_tasks`, `render` |
+| `views/player.rs` (~690 LOC) | `controls`, `lifecycle`, `poll`, `render`, `x11_errors` (+ sibling `player_util.rs`, `player_widgets.rs`) |
+
 ## Native X11 bits (all `cfg(target_os = "linux")`)
 
-| File                          | Role                                                                 |
-| ----------------------------- | -------------------------------------------------------------------- |
-| `views/tooltip.rs`            | Override-redirect tooltip window with antialiased text (Xft)         |
-| `views/popup_menu.rs`         | Native popup menus (quality / audio / subtitles)                     |
-| `views/channel_badge.rs`      | Top-left overlay: avatar · name · ⭐ (if favorite)                   |
-| `views/loading_overlay.rs`    | Black overlay with "Chargement…" during channel switch              |
-| `views/backup_player.rs`      | Low-quality mpv in its own window, hidden until needed               |
+| File | Role |
+|---|---|
+| `views/tooltip.rs` | Override-redirect tooltip window with antialiased text (Xft) |
+| `views/popup_menu.rs` | Native popup menus (quality / audio / subtitles) |
+| `views/channel_badge.rs` | Top-left overlay : avatar · name · ⭐ (if favorite) |
+| `views/loading_overlay.rs` | Black overlay with "Chargement…" during channel switch |
+| `views/backup_player.rs` | Low-quality mpv subprocess in its own X11 child window, kept off-screen until needed. `move_offscreen()` only (never `XUnmap` — would stall the decoder). |
 
 ### ARGB visual gotcha
 
@@ -167,13 +182,34 @@ On a 32-bit depth visual, `XBlackPixel` is **fully transparent** (0x00000000) �
 
 ### `websocket.rs`
 
-`rust_socketio` client on its own thread. Exposes a `Sender<ClientCommand>` and a `Receiver<ServerEvent>`. Reconnects on disconnect. On connect, sleeps 150 ms for the namespace handshake, then sends the session-local anonymous pseudo + colour.
+`rust_socketio` client on its own thread. Exposes a `Sender<ClientCommand>` and a `Receiver<ServerEvent>`. Reconnects on disconnect. On connect, sleeps `KOALA_WS_HANDSHAKE_DELAY_MS` (default 150 ms) for the namespace handshake, then sends the session-local anonymous pseudo + colour. Reconnect cooldown : `KOALA_WS_RECONNECT_COOLDOWN_SECS` (default 1). Connect backoff on error : `KOALA_WS_CONNECT_BACKOFF_SECS` (default 3). Command-loop poll tick : `KOALA_WS_CMD_TICK_SECS` (default 1).
+
+### `mpv_ipc.rs`
+
+Wrapper around an external mpv subprocess controlled by JSON IPC. `MpvIpcClient::spawn(&flags)` → `mpv --input-ipc-server=<sock> <flags>`. A reader thread demultiplexes stdout into event stream (async) + command replies (request_id-keyed). `Drop` sends SIGTERM → 500 ms → SIGKILL and removes the socket file. POC standalone binary : `cargo run --release --bin mpv_ipc_poc`. Tests : `cargo test --release -- --ignored mpv_ipc`.
+
+### `mpv_checked.rs`
+
+`mpv_try!` / `emit_try!` macros. Every IPC call site wraps the result and emits a `tracing::warn!` on failure with `op="<what>"` + `ctx="<args>"`. Silent failures used to mask bugs ; now they surface in `$XDG_DATA_HOME/KoalaTV/logs/`.
+
+### `frame_cache.rs`
+
+See [Frame snapshot cache](#frame-snapshot-cache-favorites-only).
 
 ### `ytdlp_updater.rs`
 
-- Path: `$XDG_DATA_HOME/KoalaTV/bin/yt-dlp` (or `$HOME/.local/share/…`).
-- On spawn: immediate `tick` (download if missing → `yt-dlp -U --update-to stable` → log version diff) → `thread::sleep(6 h)` → repeat.
-- `binary_path()` is read by `player.rs` to inject the path into mpv via `script-opts=ytdl_hook-ytdl_path=…`.
+- Path : `$XDG_DATA_HOME/KoalaTV/bin/yt-dlp` (or `$HOME/.local/share/KoalaTV/bin/…`).
+- On spawn : immediate tick (download if missing → `yt-dlp -U --update-to stable` → `tracing::info` with version diff) → `thread::sleep(update_interval())` → repeat.
+- `binary_path()` is read by `player.rs` and injected into mpv's spawn flags via `--script-opts=ytdl_hook-ytdl_path=…`.
+- Env : `YTDLP_UPDATE_INTERVAL_SECS` (default 21 600), `YTDLP_SPAWN_TIMEOUT_SECS` (120), `YTDLP_DOWNLOAD_URL` (GitHub latest).
+
+### `logger.rs`
+
+Structured `tracing` subscriber with file appender. Logs rotate daily in `$XDG_DATA_HOME/KoalaTV/logs/desktop.log.YYYY-MM-DD`, kept for `LOG_KEEP_DAYS` (14). Also batch-ships levels ≥ `warn` to the server `/api/logs` endpoint for centralised log capture.
+
+### `state_cache.rs`
+
+Persists `AppView::last_state_per_channel` to disk every 30 s so a fresh boot has a warm cache for the optimistic instant-zap path. Location : `$XDG_DATA_HOME/KoalaTV/state_cache.json`.
 
 ### `settings.rs`
 
@@ -226,17 +262,20 @@ main mpv VIDEO_RECONFIG
 
 ## Cargo dependencies
 
-| Crate                | Role                                              |
-| -------------------- | ------------------------------------------------- |
-| `gpui` (git, Zed)    | UI framework                                      |
-| `gpui_platform`      | X11 / Wayland backend                             |
-| `gpui-component`     | Input, Slider, Popover                            |
-| `libmpv2 = "5"`      | Video playback (C bindings to libmpv)             |
-| `reqwest = "0.12"`   | HTTP (blocking, cookies, rustls-tls)              |
-| `rust_socketio`      | Socket.IO client                                  |
-| `resvg`/`tiny-skia`  | SVG rasterization for icons                       |
-| `png`/`image`        | Avatar decoding                                   |
-| `x11-dl` (Linux)     | Xlib bindings for native windows                  |
+| Crate | Role |
+|---|---|
+| `gpui` (git, Zed) | UI framework |
+| `gpui_platform` | X11 / Wayland backend |
+| `gpui-component` | Input, Slider, Popover |
+| `reqwest = "0.12"` | HTTP (blocking, cookies, rustls-tls) |
+| `rust_socketio` | Socket.IO client |
+| `serde_json` | mpv IPC wire format |
+| `tracing` / `tracing-subscriber` / `tracing-appender` | structured logging |
+| `resvg` / `tiny-skia` | SVG rasterization for icons |
+| `png` / `image` | Avatar + snapshot decoding |
+| `x11-dl` (Linux) | Xlib bindings for native windows |
+
+No `libmpv2` — mpv runs as an external subprocess and is reached over JSON IPC on a Unix socket. The only mpv-related build-time dep is `serde_json`.
 
 ## Running
 
@@ -246,6 +285,7 @@ cargo run              # dev build
 cargo run --release    # slower build, much lower CPU during playback
 ```
 
-System requirements on Linux:
-- libmpv2 dev headers: `sudo apt install libmpv-dev`
-- X11 libs: `libx11-dev` (usually already present with a desktop)
+System requirements on Linux :
+- `mpv` runtime binary (no headers needed) — `sudo apt install mpv` or distro equivalent.
+- X11 libs : `libx11-dev` (usually already present with a desktop).
+- yt-dlp does NOT need to be pre-installed ; the app auto-downloads and self-updates its own copy under `$XDG_DATA_HOME/KoalaTV/bin/yt-dlp` on first launch.

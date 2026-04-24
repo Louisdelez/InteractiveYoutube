@@ -5,29 +5,50 @@
 ```
                        ┌──────────────────────────┐
                        │  YouTube Data API v3     │
-                       │  + yt-dlp (streams)      │
+                       │  + yt-dlp (stream URLs,  │
+                       │  pre-resolved server-side│
+                       │  then cached in Redis)   │
                        └────────────┬─────────────┘
-                                    │ (playlist build, RSS poll,
-                                    │  video stream extraction)
+                                    │
                                     ▼
  ┌────────┐   Socket.IO    ┌──────────────────────┐    HTTP + Socket.IO
- │ Web    │◀──────────────▶│   Node.js server     │◀────────────────────┐
- │ client │                │   (PM2 cluster)      │                     │
- │ (Vite+ │                │                      │                     │
- │  React)│   HTTP /api/*  │ - Playlist scheduler │                     │
- └────────┘◀──────────────▶│ - Sync broadcaster   │                     │
+ │ Web    │◀──────────────▶│   Web process        │◀────────────────────┐
+ │ client │                │   koala-tv           │                     │
+ │ (Vite  │                │   (PM2 cluster)      │                     │
+ │ +React)│   HTTP /api/*  │ - HTTP routes        │                     │
+ └────────┘◀──────────────▶│ - Socket.IO + Redis  │                     │
+                           │   adapter            │                     │
+                           │ - Sync broadcaster   │                     │
                            │ - Chat relay         │                     │
-                           │ - Cron (3 am)        │                     │
-                           │ - yt-dlp updater     │                     │
                            └──────┬───────┬───────┘                     │
                                   │       │                             │
                           ┌───────▼──┐  ┌─▼────────┐           ┌────────┴──────┐
                           │ Redis    │  │ Postgres │           │ Desktop app   │
                           │ (chat,   │  │ (users,  │           │ (Rust + GPUI  │
-                          │  rate,   │  │  settings│           │  + libmpv,    │
-                          │  viewers)│  │ , JSONB) │           │  own yt-dlp)  │
-                          └──────────┘  └──────────┘           └───────────────┘
+                          │  BullMQ, │  │  settings│           │  + 2× mpv     │
+                          │  URL     │  │  JSONB)  │           │  subprocesses │
+                          │  cache,  │  │          │           │  via IPC,     │
+                          │  viewers)│  │          │           │  own yt-dlp)  │
+                          └─────▲────┘  └──────────┘           └───────────────┘
+                                │
+                                │ BullMQ + pub/sub
+                                │
+                           ┌────┴─────────────────┐
+                           │  Worker process      │
+                           │  koala-tv-maint      │
+                           │  (single instance)   │
+                           │ - BullMQ scheduler   │
+                           │ - Daily maintenance  │
+                           │ - RSS poll (30 min)  │
+                           │ - yt-dlp updater     │
+                           │ - URL pre-resolver   │
+                           └──────────────────────┘
 ```
+
+Two Node processes, three roles :
+- **`koala-tv`** (web, cluster) — pure HTTP/WS, no scheduled work.
+- **`koala-tv-maint`** (worker, single) — all scheduled + background tasks.
+- **Redis** — message bus between the two (BullMQ for jobs, pub/sub for state changes, `@socket.io/redis-emitter` for client fan-out from the worker).
 
 ## Source of truth
 
@@ -78,13 +99,25 @@ Result: the currently-playing video is still at exactly the same second before a
 
 ## Daily 3 am maintenance
 
-One cron job (`server/cron/refresh.js`) runs at 03:00 every day:
+BullMQ scheduler persisted in Redis (`server/workers/daily-maintenance.js`). The worker process owns the schedule ; the web tier is never restarted.
 
-1. **Refresh 1/7th of the channels** (`bucket = channels.filter((_, i) => i % 7 === dayOfWeek)`) — full YouTube Data API refresh, timecode-preserving merge.
-2. **Wipe chat history** (`SCAN chat:history:* | DEL`) and broadcast `chat:cleared` to connected clients.
-3. **Restart the process** (`process.exit(1)` — PM2/nodemon respawn).
+1. `yt-dlp -U` (self-update).
+2. **Refresh 1/7th of the channels** (`bucket = index % 7 === dayOfWeek`) — YouTube Data API refresh, timecode-preserving merge, 60 s timeout per channel, failures skip.
+3. Redis rate-limit key cleanup.
+4. **Wipe chat history** (`SCAN chat:history:* | DEL`) and broadcast `chat:cleared` via the socket.io Redis adapter.
+5. Verify empty (re-SCAN + force DEL of any reliquats).
 
-On restart, `tvStartedAt` is rehydrated from disk, so virtual TV time kept flowing during the ~2 s of downtime.
+Per-step checkpoint in Redis key `maint:ckpt:<jobId>` (TTL 6 h). A crash or retry mid-pipeline resumes from the last completed step instead of restarting from scratch. Retry policy : `attempts: 3`, exponential backoff 60 s. No process restart, no downtime — active requests and Socket.IO sessions are unaffected.
+
+A second scheduler (`koala-daily-2h55-warning`, pattern `55 2 * * *`) broadcasts `maintenance:warning` 5 min before so clients render the banner.
+
+## URL pre-resolution (cold-zap optimisation)
+
+`server/workers/url-resolver.js` runs yt-dlp `-g` for every channel's current video every 30 min and caches the resulting HLS manifest URLs in Redis (`koala:url:<channelId>`, TTL 1 h). Both `tv:state` (HTTP + Socket.IO) and `tv:sync` (every 15 s) are enriched with `resolvedUrl` + `resolvedUrlLq` + `resolvedAt`.
+
+Desktop clients pass the pre-resolved URL to mpv with `ytdl=no`, skipping the ~200-800 ms yt-dlp subprocess spawn client-side. Cold-zap first-frame drops from ~300 ms to ~100 ms.
+
+Event-driven invalidation : `getTvState()` detects videoId changes against the `lastVideoIds` map (auto-advance or priority injection), drops the Redis entry, and schedules a fresh resolve via `setImmediate`. Together with the 15 s `tv:sync` enrichment, cache-hit rate sits near 100 % in steady state.
 
 ## Client-side sync loop
 
@@ -114,7 +147,7 @@ When YouTube refuses to embed a video (creator restriction), the server still kn
 - "Watch on YouTube" link with `?t=<seconds>` updated every second
 - "Install the desktop app" button (URL served by `/api/tv/desktop-download`)
 
-Sidebar + chat remain fully functional; the playhead continues advancing server-side, so when the next (embeddable) video starts, the iframe reappears automatically. The desktop app never hits this path — libmpv + yt-dlp stream directly.
+Sidebar + chat remain fully functional ; the playhead continues advancing server-side, so when the next (embeddable) video starts, the iframe reappears automatically. The desktop app never hits this path — it spawns mpv as a subprocess over JSON IPC and either plays the server-pre-resolved HLS URL (ytdl=no fast path) or falls back to `youtube.com/watch?v=<id>` with mpv's ytdl_hook.
 
 ## Horizontal scaling
 

@@ -10,12 +10,22 @@ npm run dev                    # server :4500 + vite :4501
 cd desktop && cargo run
 ```
 
-On first boot the server:
-1. Downloads `./bin/yt-dlp` from the yt-dlp GitHub release.
-2. Creates the `users` table in Postgres if missing.
-3. Builds every channel's playlist from the YouTube API (cached to `server/data/playlist-*.json`).
+`npm run dev` runs three processes in parallel via `concurrently` :
 
-The 48-channel initial build takes 5–15 minutes. Subsequent boots are instant (disk cache). Background processes (RSS poll, daily cron, yt-dlp updater) run even in dev.
+| Label | Command | Role |
+|---|---|---|
+| `web` | `nodemon server/index.js` | Express + Socket.IO — pure HTTP/WS (no cron) |
+| `worker` | `nodemon --config nodemon.worker.json workers/index.js` | BullMQ + RSS poll + yt-dlp updater + URL pre-resolver |
+| `client` | `vite` | Web client dev server on :4501 |
+
+On first boot the **worker** :
+1. Downloads `./bin/yt-dlp` from the yt-dlp GitHub release.
+2. Builds every channel's playlist from the YouTube API (cached to `server/data/playlist-*.json`). `loadFromDisk` validates `tvStartedAt` / `totalDuration` / non-empty `videos` ; malformed JSON triggers a rebuild instead of serving `NaN`.
+3. Runs the initial URL-resolver sweep (~110 s for 52 channels @ concurrency 2) so cold zap serves pre-resolved URLs from Redis.
+
+On first boot the **web** just creates the `users` table in Postgres if missing.
+
+The 48-channel initial playlist build takes 5–15 minutes. Subsequent boots are instant (disk cache). Nodemon is configured with `ignore: ["data/**"]` on both so playlist JSON writes from the worker don't restart the web (the old "nodemon clobbering nightly cron" class of bugs).
 
 ## Production — Docker Compose
 
@@ -45,10 +55,18 @@ Multi-stage:
 
 ## PM2 (`ecosystem.config.js`)
 
-- `instances: 'max'` → one worker per CPU core (cluster mode).
-- `max_memory_restart: 300M`, `node_args: --max-old-space-size=512`.
-- Graceful shutdown: `kill_timeout: 10000`, `listen_timeout: 10000`, `shutdown_with_message: true`.
-- `autorestart: true`, `max_restarts: 10`, `restart_delay: 1000` — the daily 3 am `process.exit(1)` is well within this budget.
+Two apps defined :
+
+| App | Role | Cluster |
+|---|---|---|
+| `koala-tv` | web — Express + Socket.IO | `instances: 'max'` |
+| `koala-tv-maint` | maintenance worker — BullMQ + RSS + URL resolver + yt-dlp updater | `instances: 1` |
+
+Worker is always single-instance — the cron schedule lives in Redis via BullMQ so multiple workers would stampede the same job. Web is cluster-mode for HTTP/WS throughput ; Socket.IO uses the Redis adapter so rooms + events fan out across workers.
+
+- `max_memory_restart: 300M`, `node_args: --max-old-space-size=512` on web. Worker headroom is larger (refreshPlaylist holds ~48 playlists in RAM).
+- Graceful shutdown : `kill_timeout: 10000`, `listen_timeout: 10000`, `shutdown_with_message: true`.
+- `autorestart: true`, `max_restarts: 10`, `restart_delay: 1000`. The daily 3 am maintenance no longer restarts any process — BullMQ retries in-process with checkpoint recovery.
 - Logs merged to `./logs/out.log` and `./logs/error.log` with ISO timestamps.
 
 ## nginx (`nginx/nginx.conf`)
@@ -85,23 +103,37 @@ Never commit the real `.env` — the template is `.env.example`, and `.env` is g
 
 ## Maintenance cron
 
-`server/cron/refresh.js` runs inside the Node process (no system crontab). Every day at **03:00 local server time**:
+Lives in the `koala-tv-maint` process. BullMQ scheduler persisted in Redis ; survives worker restarts. Default times come from env (see [SERVER.md](SERVER.md#configuration)).
 
-1. Refresh 1/7th of the channels via the YouTube API (bucket = `index % 7 === dayOfWeek`). Uses timecode-preserving merge.
-2. Wipe all Redis chat histories (`SCAN chat:history:* | DEL`) and broadcast `chat:cleared` so clients clear their UI.
-3. `process.exit(1)` → PM2 respawns the workers. The 2 s delay gives logs and sockets time to flush.
+| Scheduler | Default pattern | Job |
+|---|---|---|
+| `koala-daily-3am` | `DAILY_REFRESH_CRON` = `0 3 * * *` | 5-step pipeline with Redis checkpoints (TTL 6 h) so a crash mid-run resumes from the last completed step. Steps : `yt-dlp -U` → refresh 1/7 channels → Redis rate-limit key cleanup → chat history wipe + `chat:cleared` broadcast → verify empty. |
+| `koala-daily-2h55-warning` | `DAILY_WARNING_CRON` = `55 2 * * *` | Broadcast `maintenance:warning` 5 min before the refresh so clients show the banner. |
 
-Side effects you should be aware of:
-- Metrics counters reset (PM2 respawn creates fresh prom-client registries).
-- Logged-in users stay authenticated (JWT cookie survives).
-- Active HTTP requests are aborted — clients retry.
+**No process restart.** Metrics counters don't reset. Logged-in users stay authenticated. Active HTTP requests keep running (web tier is never touched).
+
+Manual triggers (loopback-only) :
+
+```
+POST /api/admin/maintenance-trigger   # enqueues an immediate daily-maintenance job
+POST /api/admin/maintenance-reset     # force-resolves a stuck banner
+GET  /api/admin/cron-status           # schedulers, waiting/active counts, recent runs
+```
+
+Dead-man switch : set `HEALTHCHECKS_URL` to a Healthchecks.io (or compatible) URL ; the worker pings it on success and `/fail` on failure after each daily run.
+
+## URL pre-resolution
+
+The worker pre-resolves googlevideo URLs via yt-dlp for every channel's current video and caches them in Redis (`koala:url:<channelId>`, TTL 1 h). Every `tv:state` / `tv:sync` is enriched with `resolvedUrl` + `resolvedUrlLq` + `resolvedAt`. Desktop clients pass these straight to mpv with `ytdl=no`, skipping the ~200-800 ms yt-dlp step on cold zap.
+
+Event-driven invalidation : on detected video change (auto-advance or priority injection), the cache for that channel is dropped and a fresh resolve is scheduled via `setImmediate`. Env : `URL_RESOLVER_INTERVAL_MS` (30 min sweep), `URL_RESOLVER_CONCURRENCY` (2), `URL_RESOLVER_CACHE_TTL_SECS` (3600), plus the format selectors `URL_RESOLVER_FMT_{MAIN,LQ}`.
 
 ## yt-dlp auto-update
 
-Two independent updaters:
+Two independent updaters :
 
-- **Server**: `server/services/ytdlp-updater.js` manages `./bin/yt-dlp`. Downloads on first run, `-U` every 6 h. `server/scripts/ytdlp-audit.sh` and the server itself use this binary.
-- **Desktop**: `desktop/src/services/ytdlp_updater.rs` manages `$XDG_DATA_HOME/KoalaTV/bin/yt-dlp`. Same logic. libmpv is pointed at this binary via `script-opts=ytdl_hook-ytdl_path=…`.
+- **Server worker** : `server/services/ytdlp-updater.js` manages `./bin/yt-dlp`. Downloads on first run, `-U` every `YTDLP_UPDATE_INTERVAL_MS` (6 h). `server/scripts/ytdlp-audit.sh` and the URL resolver both use this binary. The web tier doesn't touch it.
+- **Desktop** : `desktop/src/services/ytdlp_updater.rs` manages `$XDG_DATA_HOME/KoalaTV/bin/yt-dlp`. Same logic. mpv is pointed at this binary via `--script-opts=ytdl_hook-ytdl_path=…` at subprocess spawn time.
 
 Both are intentionally separate so the desktop works offline of the server.
 
@@ -135,7 +167,8 @@ Key metrics to alert on:
 
 ## Gotchas
 
-- **Apple Silicon**: libmpv for the desktop app builds fine via Homebrew, but the dev experience is Linux-first; we've never shipped a macOS build.
-- **Clustered Socket.IO**: always behind nginx `ip_hash` (polling fallback would break otherwise). The Redis adapter handles broadcast fan-out between workers.
-- **CORS + cookies**: if the web client is served from a different origin than the API, set `CLIENT_ORIGIN` correctly and put them behind the same parent domain. Cookies are `SameSite=strict` in production.
-- **Daily restart and long-running HTTP**: don't park an upload or long-poll at 02:59 — it'll be cut at 03:00:02.
+- **Apple Silicon** : the desktop spawns `mpv` as a subprocess — only the mpv runtime is needed (`brew install mpv`), no libmpv headers. The X11 overlays (popup menus, tooltip, badge, backup player) are still Linux-only ; on macOS the app today is a "separate window" mpv without in-window embed. See [CROSS_PLATFORM.md](CROSS_PLATFORM.md).
+- **Clustered Socket.IO** : always behind nginx `ip_hash` (polling fallback would break otherwise). The Redis adapter handles broadcast fan-out between workers.
+- **CORS + cookies** : if the web client is served from a different origin than the API, set `CLIENT_ORIGIN` correctly and put them behind the same parent domain. Cookies are `SameSite=strict` in production.
+- **Daily maintenance** : no longer restarts any process. Requests in flight at 03:00 are unaffected. Only side effect is the chat history wipe + client banner.
+- **Loopback rate limit exempt** : the Socket.IO IP-rate-limiter (`SOCKET_MAX_CONNECTIONS_PER_IP`) skips `127.0.0.1` / `::1` / `::ffff:127.0.0.1`. Dev `pkill -9` cycles on the desktop used to wedge the local socket once the counter climbed past the cap (no clean disconnect packet → no decrement). Still active on non-loopback traffic.
