@@ -231,8 +231,24 @@ pub(super) fn state_prefetch(
                         Ok((id, state)) => {
                             if let Some(this) = entity_for_prefetch.upgrade() {
                                 let _ = cx.update(|cx| {
-                                    this.update(cx, |app: &mut AppView, _| {
-                                        app.last_state_per_channel.insert(id, state);
+                                    this.update(cx, |app: &mut AppView, cx| {
+                                        // Same dispatch-path hook : if this
+                                        // channel is a favorite and its
+                                        // thumbnail cache is stale/missing,
+                                        // fetch it now. Handles the boot
+                                        // window before the first tv:sync
+                                        // arrives (~15 s after connect).
+                                        let is_fav = app.settings.favorites.iter().any(|f| f == &id);
+                                        let needs = is_fav && app.frame_cache.needs_refresh(&id, &state.video_id);
+                                        app.last_state_per_channel.insert(id.clone(), state.clone());
+                                        if needs {
+                                            fetch_snapshot(
+                                                cx.entity().downgrade(),
+                                                id,
+                                                state.video_id,
+                                                cx,
+                                            );
+                                        }
                                     });
                                 });
                             }
