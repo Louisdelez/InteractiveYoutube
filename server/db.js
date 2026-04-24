@@ -1,5 +1,6 @@
 const { Pool } = require('pg');
 const config = require('./config');
+const log = require('./services/logger').child({ component: 'db' });
 
 const pool = new Pool({
   connectionString: config.DATABASE_URL,
@@ -9,7 +10,7 @@ const pool = new Pool({
 });
 
 pool.on('error', (err) => {
-  console.error('[DB] Unexpected pool error:', err.message);
+  log.error({ err: err.message }, 'pg pool unexpected error');
 });
 
 // Initialize schema
@@ -31,7 +32,7 @@ async function initDB() {
   );
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_users_username ON users(username)`);
-  console.log('[DB] PostgreSQL initialized');
+  log.info('postgres initialised');
 }
 
 async function getUserSettings(userId) {

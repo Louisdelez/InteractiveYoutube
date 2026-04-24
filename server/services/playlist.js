@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const { fetchAllVideoIds, fetchOrderedVideoIds, fetchVideoDetails } = require('./youtube');
 const config = require('../config');
+const log = require('./logger').child({ component: 'playlist' });
 
 const DATA_DIR = path.join(__dirname, '..', 'data');
 
@@ -58,16 +59,16 @@ function saveToDisk(channelId) {
     // Atomic write: write to temp file, then rename (rename is atomic on Linux)
     fs.writeFile(tmpPath, data, (err) => {
       if (err) {
-        console.error(`[Playlist:${channelId}] Failed to save:`, err.message);
+        log.error({ channelId, err: err.message }, 'save: writeFile failed');
         return;
       }
       fs.rename(tmpPath, filePath, (err) => {
-        if (err) console.error(`[Playlist:${channelId}] Failed to rename:`, err.message);
-        else console.log(`[Playlist:${channelId}] Saved to disk (${state.videos.length} videos)`);
+        if (err) log.error({ channelId, err: err.message }, 'save: rename failed');
+        else log.debug({ channelId, videos: state.videos.length }, 'saved to disk');
       });
     });
   } catch (err) {
-    console.error(`[Playlist:${channelId}] Serialize error:`, err.message);
+    log.error({ channelId, err: err.message }, 'save: serialize error');
   }
 }
 
@@ -77,7 +78,7 @@ function loadFromDisk(channelId) {
     const state = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
     state.prefixSums = buildPrefixSums(state.videos);
     playlists.set(channelId, state);
-    console.log(`[Playlist:${channelId}] Loaded from disk (${state.videos.length} videos)`);
+    log.info({ channelId, videos: state.videos.length }, 'loaded from disk');
     return true;
   }
   return false;
@@ -96,7 +97,7 @@ function reloadFromDisk(channelId) {
 async function buildPlaylist(channelId, channel) {
   if (channel.ordered && channel.fixedVideoIds) {
     // Fixed video list (e.g., Noob: specific videos in order)
-    console.log(`[Playlist:${channelId}] Building ORDERED from ${channel.fixedVideoIds.length} fixed videos...`);
+    log.info({ channelId, source: 'fixed', count: channel.fixedVideoIds.length }, 'building ordered playlist');
     const allVideoIds = channel.fixedVideoIds;
     const videos = await fetchVideoDetails(allVideoIds, { skipShortsFilter: true, skipLiveFilter: true });
 
@@ -122,7 +123,7 @@ async function buildPlaylist(channelId, channel) {
   }
 
   if (channel.ordered && channel.youtubePlaylists) {
-    console.log(`[Playlist:${channelId}] Building ORDERED from ${channel.youtubePlaylists.length} playlists...`);
+    log.info({ channelId, source: 'playlists', count: channel.youtubePlaylists.length }, 'building ordered playlist');
     const allVideoIds = await fetchOrderedVideoIds(channel.youtubePlaylists);
     // For ordered: don't filter shorts via HEAD (these are curated playlists)
     // But still fetch details for duration and embeddable check
@@ -151,7 +152,7 @@ async function buildPlaylist(channelId, channel) {
 
   // Normal channel: fetch from YouTube channel uploads + shuffle
   const youtubeChannelIds = channel.youtubeChannelIds;
-  console.log(`[Playlist:${channelId}] Building from YouTube (${youtubeChannelIds.length} source(s))...`);
+  log.info({ channelId, sources: youtubeChannelIds.length }, 'building from YouTube');
   let allVideoIds = [];
   for (const ytId of youtubeChannelIds) {
     const ids = await fetchAllVideoIds(ytId);
@@ -165,7 +166,7 @@ async function buildPlaylist(channelId, channel) {
     }
   }
   allVideoIds = [...new Set(allVideoIds)];
-  console.log(`[Playlist:${channelId}] Total unique video IDs: ${allVideoIds.length}`);
+  log.info({ channelId, uniqueIds: allVideoIds.length }, 'collected video IDs');
   const videos = await fetchVideoDetails(allVideoIds, {
     skipLiveFilter: !!channel.includeLives,
   });
@@ -200,7 +201,7 @@ async function initAllPlaylists() {
       try {
         await buildPlaylist(channel.id, channel);
       } catch (err) {
-        console.error(`[Playlist:${channel.id}] Build failed (will retry on next refresh): ${err.message}`);
+        log.error({ channelId: channel.id, err: err.message }, 'initial build failed (will retry on next refresh)');
       }
     }
   }
@@ -268,7 +269,7 @@ async function refreshPlaylist(channelId) {
   // in-flight Promise. Different channels run in parallel.
   const inflight = refreshLocks.get(channelId);
   if (inflight) {
-    console.log(`[Playlist:${channelId}] Refresh already in progress, awaiting it`);
+    log.debug({ channelId }, 'refresh already in progress, awaiting');
     return inflight;
   }
 
@@ -281,18 +282,18 @@ async function refreshPlaylist(channelId) {
 
       // No prior state → bootstrap build (original path: new shuffle + start).
       if (!oldState) {
-        console.log(`[Playlist:${channelId}] Full build (no prior state)...`);
+        log.info({ channelId }, 'full build (no prior state)');
         await buildPlaylist(channelId, channel);
         return playlists.get(channelId);
       }
 
-      console.log(`[Playlist:${channelId}] Refresh (timecode-preserving)...`);
+      log.info({ channelId }, 'refresh (timecode-preserving)');
       const freshIds = await fetchFreshVideoIdsForChannel(channel);
       const knownIds = new Set(oldState.videos.map((v) => v.videoId));
       const trulyNewIds = freshIds.filter((id) => !knownIds.has(id));
 
       if (trulyNewIds.length === 0) {
-        console.log(`[Playlist:${channelId}] Refresh: no new videos, state unchanged`);
+        log.debug({ channelId }, 'refresh: no new videos, state unchanged');
         oldState.lastRefresh = Date.now();
         saveToDisk(channelId);
         return oldState;
@@ -308,9 +309,7 @@ async function refreshPlaylist(channelId) {
       );
       playlists.set(channelId, newState);
       saveToDisk(channelId);
-      console.log(
-        `[Playlist:${channelId}] Refresh: +${added} videos (total ${newState.videos.length}), timecode preserved`
-      );
+      log.info({ channelId, added, total: newState.videos.length }, 'refresh complete (timecode preserved)');
       return newState;
     } finally {
       refreshLocks.delete(channelId);
@@ -334,7 +333,7 @@ function addNewVideos(channelId, newVideos) {
   const { state: next, added } = mergePlaylistPreservingTimecode(state, trulyNew);
   playlists.set(channelId, next);
   saveToDisk(channelId);
-  console.log(`[Playlist:${channelId}] Added ${added} new videos (timecode preserved)`);
+  log.info({ channelId, added }, 'added new videos (timecode preserved)');
 }
 
 function getPlaylist(channelId) {

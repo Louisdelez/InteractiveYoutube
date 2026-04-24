@@ -1,4 +1,5 @@
 const { getPlaylist } = require('./playlist');
+const log = require('./logger').child({ component: 'tv' });
 
 // Per-channel cache and priority queues
 const channelCache = new Map(); // channelId -> { state, cachedAt }
@@ -14,7 +15,7 @@ function queuePriorityVideo(channelId, video) {
   if (queue.some((v) => v.videoId === video.videoId)) return;
   queue.push(video);
   channelCache.delete(channelId);
-  console.log(`[TV:${channelId}] Priority queued: "${video.title}"`);
+  log.info({ channelId, title: video.title }, 'priority queued');
 }
 
 function getTvState(channelId) {
@@ -103,7 +104,7 @@ function getTvState(channelId) {
     pState.startedAt = null;
     priorityState.set(channelId, pState);
     channelCache.delete(channelId);
-    console.log(`[TV:${channelId}] Priority video finished, resuming rotation`);
+    log.info({ channelId }, 'priority video finished, resuming rotation');
   }
 
   // Detect video change → inject priority
@@ -114,7 +115,7 @@ function getTvState(channelId) {
     priorityState.set(channelId, pState);
     const priorityVideo = queue[0];
     lastVideoIds.set(channelId, priorityVideo.videoId);
-    console.log(`[TV:${channelId}] Playing priority: "${priorityVideo.title}"`);
+    log.info({ channelId, title: priorityVideo.title }, 'playing priority video');
 
     const next = queue[1]
       ? { id: queue[1].videoId, title: queue[1].title, duration: queue[1].duration }

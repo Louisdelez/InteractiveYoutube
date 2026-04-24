@@ -1,5 +1,6 @@
 const { XMLParser } = require('fast-xml-parser');
 const { getVideoIds } = require('./playlist');
+const log = require('./logger').child({ component: 'rss' });
 
 const parser = new XMLParser();
 
@@ -8,7 +9,7 @@ async function checkForNewUploads(channelId, youtubeChannelId) {
     const url = `https://www.youtube.com/feeds/videos.xml?channel_id=${youtubeChannelId}`;
     const res = await fetch(url);
     if (!res.ok) {
-      console.error(`[RSS:${channelId}] Fetch failed: ${res.status}`);
+      log.warn({ channelId, status: res.status }, 'rss fetch failed');
       return [];
     }
 
@@ -25,12 +26,12 @@ async function checkForNewUploads(channelId, youtubeChannelId) {
     const newIds = rssVideoIds.filter((id) => !existingIds.has(id));
 
     if (newIds.length > 0) {
-      console.log(`[RSS:${channelId}] Found ${newIds.length} new video(s): ${newIds.join(', ')}`);
+      log.info({ channelId, newIds }, 'rss found new video(s)');
     }
 
     return newIds;
   } catch (err) {
-    console.error(`[RSS:${channelId}] Error:`, err.message);
+    log.error({ channelId, err: err.message }, 'rss error');
     return [];
   }
 }

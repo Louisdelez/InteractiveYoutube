@@ -1,6 +1,7 @@
 const { getTvState } = require('../services/tv');
 const config = require('../config');
 const metrics = require('../services/metrics');
+const log = require('../services/logger').child({ component: 'socket:tv' });
 
 let syncInterval = null;
 
@@ -66,7 +67,7 @@ function startSyncBroadcast(io) {
     metrics.syncBroadcastDuration.observe(Date.now() - start);
   }, config.DRIFT_CORRECTION_INTERVAL_MS);
 
-  console.log(`[TV] Sync broadcast started (every ${config.DRIFT_CORRECTION_INTERVAL_MS / 1000}s)`);
+  log.info({ intervalMs: config.DRIFT_CORRECTION_INTERVAL_MS }, 'tv:sync broadcast started');
 }
 
 function stopSyncBroadcast() {

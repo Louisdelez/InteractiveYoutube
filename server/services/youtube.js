@@ -3,6 +3,7 @@ const https = require('https');
 const fs = require('fs');
 const path = require('path');
 const config = require('../config');
+const log = require('./logger').child({ component: 'youtube' });
 
 const youtube = google.youtube({
   version: 'v3',
@@ -97,11 +98,11 @@ async function filterOutShorts(videos, concurrency = 20) {
     }
 
     if ((i + concurrency) % 200 === 0 || i + concurrency >= videos.length) {
-      console.log(`[YouTube] Shorts filter: checked ${Math.min(i + concurrency, videos.length)}/${videos.length} (${shortsCount} shorts found)`);
+      log.debug({ checked: Math.min(i + concurrency, videos.length), total: videos.length, shortsCount }, 'shorts filter progress');
     }
   }
 
-  console.log(`[YouTube] Filtered out ${shortsCount} Shorts, ${results.length} normal videos remaining`);
+  log.info({ shortsFiltered: shortsCount, remaining: results.length }, 'shorts filter done');
   // Persist whatever we learned to the disk cache.
   flushShortsCache();
   return results;
@@ -127,7 +128,7 @@ async function fetchAllVideoIds(channelId) {
   const videoIds = [];
   let pageToken = undefined;
 
-  console.log(`[YouTube] Fetching videos from playlist ${uploadsPlaylistId}...`);
+  log.debug({ uploadsPlaylistId }, 'fetching videos from uploads playlist');
 
   do {
     const res = await youtube.playlistItems.list({
@@ -142,10 +143,10 @@ async function fetchAllVideoIds(channelId) {
     }
 
     pageToken = res.data.nextPageToken;
-    console.log(`[YouTube] Fetched ${videoIds.length} video IDs so far...`);
+    log.trace({ soFar: videoIds.length }, 'fetching more pages');
   } while (pageToken);
 
-  console.log(`[YouTube] Total video IDs: ${videoIds.length}`);
+  log.info({ uploadsPlaylistId, videoIds: videoIds.length }, 'fetched all videos from uploads');
   return videoIds;
 }
 
@@ -177,10 +178,10 @@ async function fetchOrderedVideoIds(playlistIds) {
   const allIds = [];
   for (let i = 0; i < playlistIds.length; i++) {
     const ids = await fetchPlaylistVideoIds(playlistIds[i]);
-    console.log(`[YouTube] Playlist ${i + 1}/${playlistIds.length}: ${ids.length} videos`);
+    log.debug({ playlist: i + 1, of: playlistIds.length, videos: ids.length }, 'fetched playlist');
     allIds.push(...ids);
   }
-  console.log(`[YouTube] Total ordered video IDs: ${allIds.length}`);
+  log.info({ totalOrderedIds: allIds.length }, 'fetched ordered playlists');
   return allIds;
 }
 
@@ -218,13 +219,13 @@ async function fetchVideoDetails(videoIds, options = {}) {
       }
     }
 
-    console.log(`[YouTube] Fetched details for ${Math.min(i + 50, videoIds.length)}/${videoIds.length} videos`);
+    log.trace({ fetched: Math.min(i + 50, videoIds.length), total: videoIds.length }, 'video details batch done');
   }
 
   if (livesFiltered > 0) {
-    console.log(`[YouTube] Filtered out ${livesFiltered} live streams/replays`);
+    log.info({ livesFiltered }, 'filtered out live streams / replays');
   }
-  console.log(`[YouTube] Embeddable videos (before Shorts filter): ${videos.length}`);
+  log.info({ videos: videos.length }, 'embeddable videos (before shorts filter)');
 
   // Filter out YouTube Shorts (skip for ordered/curated playlists)
   if (options.skipShortsFilter) {

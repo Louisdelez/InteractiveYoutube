@@ -1,5 +1,6 @@
 const Redis = require('ioredis');
 const config = require('../config');
+const log = require('./logger').child({ component: 'redis' });
 
 const REDIS_URL = config.REDIS_URL || 'redis://localhost:6379';
 
@@ -13,8 +14,8 @@ const redis = new Redis(REDIS_URL, {
   lazyConnect: false,
 });
 
-redis.on('connect', () => console.log('[Redis] Connected'));
-redis.on('error', (err) => console.error('[Redis] Error:', err.message));
+redis.on('connect', () => log.info('connected'));
+redis.on('error', (err) => log.error({ err: err.message }, 'redis error'));
 
 // Pub client for Socket.IO adapter
 const redisPub = new Redis(REDIS_URL);
