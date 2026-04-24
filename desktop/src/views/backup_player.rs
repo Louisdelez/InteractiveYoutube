@@ -170,7 +170,7 @@ impl BackupPlayer {
     }
 
     pub fn seek(&self, seconds: f64) {
-        let _ = self.mpv.set_property("time-pos", seconds);
+        mpv_try!(self.mpv.set_property("time-pos", seconds), "backup seek", seconds);
     }
 
     pub fn time_pos(&self) -> Option<f64> {
@@ -190,7 +190,7 @@ impl BackupPlayer {
             }
             self.visible = true;
         }
-        let _ = self.mpv.set_property("mute", false);
+        mpv_try!(self.mpv.set_property("mute", false), "backup unmute");
     }
 
     /// Move the backup window off-screen (without unmapping). mpv keeps
@@ -220,7 +220,7 @@ impl BackupPlayer {
         // budget) so a cached channel doesn't keep pulling HLS
         // segments. Any smaller = re-fetch loops (chunks are 5-10 s).
         for (k, v) in crate::services::mpv_profiles::backup_freeze_props() {
-            let _ = self.mpv.set_property(&k, &v);
+            mpv_try!(self.mpv.set_property(&k, &v), "backup property set", &k);
         }
     }
 
@@ -228,7 +228,7 @@ impl BackupPlayer {
     /// `backup_thaw` profile.
     pub fn thaw(&mut self) {
         for (k, v) in crate::services::mpv_profiles::backup_thaw_props() {
-            let _ = self.mpv.set_property(&k, &v);
+            mpv_try!(self.mpv.set_property(&k, &v), "backup property set", &k);
         }
     }
 
@@ -250,7 +250,7 @@ impl BackupPlayer {
             }
             self.visible = false;
         }
-        let _ = self.mpv.set_property("mute", true);
+        mpv_try!(self.mpv.set_property("mute", true), "backup mute");
     }
 
     #[allow(dead_code)]
