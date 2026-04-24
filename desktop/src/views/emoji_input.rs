@@ -3,6 +3,7 @@
 //! (same mechanism Zed uses for its editor buffers).
 
 use gpui::*;
+use crate::i18n::t;
 use std::ops::Range;
 use std::sync::Arc;
 use std::collections::HashMap;
@@ -452,7 +453,7 @@ impl Render for EmojiInput {
             .child(if is_empty && !focused {
                 div()
                     .text_color(rgb(0x666666))
-                    .child("Envoyer un message...")
+                    .child(t("common.send_message_placeholder"))
                     .into_any_element()
             } else {
                 div()

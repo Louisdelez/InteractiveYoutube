@@ -2,6 +2,7 @@ use gpui::*;
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use crate::i18n::t;
 use crate::services::api::{self, GifResult};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -27,7 +28,7 @@ impl GifPicker {
     pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
         let search_input = cx.new(|cx| {
             gpui_component::input::InputState::new(window, cx)
-                .placeholder("Rechercher un GIF...")
+                .placeholder(t("common.search_gif"))
         });
 
         let input_clone = search_input.clone();
@@ -239,7 +240,7 @@ impl Render for GifPicker {
                             .justify_center()
                             .text_xs()
                             .text_color(rgb(0x666666))
-                            .child("Chargement...")
+                            .child(t("common.loading"))
                             .into_any_element()
                     } else if tiles.is_empty() {
                         div()
@@ -250,7 +251,7 @@ impl Render for GifPicker {
                             .justify_center()
                             .text_xs()
                             .text_color(rgb(0x666666))
-                            .child("Aucun GIF trouvé")
+                            .child(t("common.no_gif_found"))
                             .into_any_element()
                     } else {
                         div()

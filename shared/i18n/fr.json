@@ -15,7 +15,13 @@
   "chat.send": "Envoyer",
   "chat.cancel": "Annuler",
 
+  "common.loading": "Chargement…",
+  "common.search_gif": "Rechercher un GIF…",
+  "common.no_gif_found": "Aucun GIF trouvé",
+  "common.send_message_placeholder": "Envoyer un message…",
   "topbar.programme.label": "Programme",
+  "planning.title": "Programme",
+  "planning.loading": "Chargement du planning…",
   "topbar.connect.label": "Connexion",
   "topbar.disconnect.label": "Déconnexion",
   "topbar.search.placeholder": "Rechercher une chaîne…",

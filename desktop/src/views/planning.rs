@@ -5,6 +5,7 @@
 //! Auto-scrolls so the red "now" line sits centred on open.
 
 use gpui::*;
+use crate::i18n::t;
 use gpui_component::input::{InputState, Input, InputEvent};
 use std::sync::Arc;
 
@@ -323,7 +324,7 @@ impl Render for PlanningView {
                     .text_sm()
                     .font_weight(FontWeight::SEMIBOLD)
                     .text_color(rgb(0xf4f4f6))
-                    .child("Programme"),
+                    .child(t("planning.title")),
             )
             .child({
                 // Dropdown button — shows the selected channel + chevron,
@@ -428,7 +429,7 @@ impl Render for PlanningView {
                 .items_center()
                 .justify_center()
                 .text_color(rgb(0x8a8a90))
-                .child("Chargement du planning…")
+                .child(t("planning.loading"))
                 .into_any_element()
         } else if let Some(pl) = self.playlist.clone() {
             self.render_grid(pl, days, cx).into_any_element()
