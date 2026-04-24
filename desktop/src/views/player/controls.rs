@@ -230,7 +230,7 @@ impl PlayerView {
                 (items, Some(self.quality_idx))
             }
             MenuKind::Captions => {
-                let mut items = vec!["Off".to_string()];
+                let mut items = vec![crate::i18n::t("player.captions_off")];
                 let tracks = self.list_sub_tracks();
                 let current_sid = self.mpv.get_property::<i64>("sid").ok();
                 let mut selected = if self.captions_on { None } else { Some(0) };
