@@ -20,8 +20,7 @@ impl AppView {
             return;
         }
         let initial = self.settings.clone();
-        let remote_url = self.remote_server.as_ref().map(|s| s.url.clone());
-        let modal = cx.new(|_| SettingsModal::new(initial, remote_url));
+        let modal = cx.new(|_| SettingsModal::new(initial));
         let player_clone = self.player.clone();
         let _sub = cx.subscribe(
             &modal,
@@ -59,6 +58,38 @@ impl AppView {
         #[cfg(target_os = "linux")]
         self.player.update(cx, |p, _| p.hide_video());
         self.settings_modal = Some(modal);
+        cx.notify();
+    }
+
+    /// Toggle the remote-control modal. Clicking the top-bar button
+    /// a second time while open closes it.
+    pub(super) fn toggle_remote(&mut self, cx: &mut Context<Self>) {
+        if self.remote_modal.is_some() {
+            self.close_remote(cx);
+            return;
+        }
+        use crate::views::remote_modal::{RemoteModal, RemoteModalEvent};
+        let remote_url = self.remote_server.as_ref().map(|s| s.url.clone());
+        let modal = cx.new(|_| RemoteModal::new(remote_url));
+        self.remote_modal_sub = Some(cx.subscribe(
+            &modal,
+            move |this: &mut AppView, _modal, ev: &RemoteModalEvent, cx| match ev {
+                RemoteModalEvent::Close => this.close_remote(cx),
+            },
+        ));
+        // Hide mpv X11 child so the modal isn't covered by the X11
+        // video surface (same pattern as open_settings).
+        #[cfg(target_os = "linux")]
+        self.player.update(cx, |p, _| p.hide_video());
+        self.remote_modal = Some(modal);
+        cx.notify();
+    }
+
+    fn close_remote(&mut self, cx: &mut Context<Self>) {
+        #[cfg(target_os = "linux")]
+        self.player.update(cx, |p, _| p.show_video());
+        self.remote_modal = None;
+        self.remote_modal_sub = None;
         cx.notify();
     }
 

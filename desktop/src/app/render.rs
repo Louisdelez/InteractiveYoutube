@@ -334,6 +334,35 @@ impl Render for AppView {
                             })
                             // Settings gear icon — opens the settings
                             // modal (memory cache size, purge).
+                            // Remote control — opens the QR-code pairing
+                            // modal. Placed just before the gear so the
+                            // "infrastructure / config" group stays together.
+                            .child({
+                                let remote_icon = self
+                                    .icons
+                                    .borrow_mut()
+                                    .get(IconName::Remote, 16, 0xaaaaaa);
+                                let active = self.remote_modal.is_some();
+                                let bg = if active { rgb(0x9b59b6) } else { rgb(0x18181b) };
+                                let mut btn = div()
+                                    .id("remote-open")
+                                    .w(px(24.0))
+                                    .h(px(24.0))
+                                    .flex()
+                                    .items_center()
+                                    .justify_center()
+                                    .rounded(px(4.0))
+                                    .cursor_pointer()
+                                    .bg(bg)
+                                    .hover(|this| this.bg(rgb(0x26262b)))
+                                    .on_click(cx.listener(|this, _ev: &ClickEvent, _, cx| {
+                                        this.toggle_remote(cx);
+                                    }));
+                                if let Some(icon) = remote_icon {
+                                    btn = btn.child(img(icon).w(px(16.0)).h(px(16.0)));
+                                }
+                                btn
+                            })
                             .child({
                                 let gear = self
                                     .icons
@@ -462,6 +491,24 @@ impl Render for AppView {
                 None => div().into_any_element(),
             })
             .child(match self.settings_modal.clone() {
+                Some(modal) => deferred(
+                    div()
+                        .absolute()
+                        .top_0()
+                        .left_0()
+                        .size_full()
+                        .bg(rgba(0x000000cc))
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .child(modal)
+                        .occlude(),
+                )
+                .with_priority(11)
+                .into_any_element(),
+                None => div().into_any_element(),
+            })
+            .child(match self.remote_modal.clone() {
                 Some(modal) => deferred(
                     div()
                         .absolute()

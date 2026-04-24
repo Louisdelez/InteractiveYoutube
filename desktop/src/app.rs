@@ -104,6 +104,14 @@ pub struct AppView {
     pub(super) total_viewers: usize,
     /// Settings modal (gear icon in topbar). None = closed.
     pub(super) settings_modal: Option<Entity<SettingsModal>>,
+    /// Remote-control modal (QR code + pairing URL). Opened from
+    /// a dedicated top-bar button, closed via the ✕ or by clicking
+    /// the button again.
+    pub(super) remote_modal: Option<Entity<crate::views::remote_modal::RemoteModal>>,
+    /// Subscription to the remote modal's Close event. Replaced on
+    /// every open so we don't leak stale Subscriptions into
+    /// `_subscriptions` (same pattern as `planning_sub`).
+    pub(super) remote_modal_sub: Option<Subscription>,
     /// Full-screen planning (TV guide) view. None = closed.
     pub(super) planning: Option<Entity<PlanningView>>,
     /// Close-event subscription for the current planning entity. Replaced
@@ -290,6 +298,8 @@ impl AppView {
                 chat_open: true,
                 total_viewers: 0,
                 settings_modal: None,
+                remote_modal: None,
+                remote_modal_sub: None,
                 planning: None,
                 planning_sub: None,
                 settings: initial_settings,

@@ -5,6 +5,7 @@ pub mod player_widgets;
 pub mod chat;
 pub mod auth;
 pub mod settings_modal;
+pub mod remote_modal;
 pub mod tooltip;
 pub mod icons;
 pub mod planning;

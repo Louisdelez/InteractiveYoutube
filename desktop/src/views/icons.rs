@@ -29,6 +29,7 @@ const SVG_MSG_OFF: &[u8] = include_bytes!("../../assets/icons/message-square-off
 const SVG_REFRESH: &[u8] = include_bytes!("../../assets/icons/refresh-cw.svg");
 const SVG_CALENDAR: &[u8] = include_bytes!("../../assets/icons/calendar.svg");
 const SVG_SMILE_PLUS: &[u8] = include_bytes!("../../assets/icons/smile-plus.svg");
+const SVG_REMOTE: &[u8] = include_bytes!("../../assets/icons/remote.svg");
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
 pub enum IconName {
@@ -51,6 +52,7 @@ pub enum IconName {
     Refresh,
     Calendar,
     SmilePlus,
+    Remote,
 }
 
 impl IconName {
@@ -75,6 +77,7 @@ impl IconName {
             IconName::Refresh => SVG_REFRESH,
             IconName::Calendar => SVG_CALENDAR,
             IconName::SmilePlus => SVG_SMILE_PLUS,
+            IconName::Remote => SVG_REMOTE,
         }
     }
 }
