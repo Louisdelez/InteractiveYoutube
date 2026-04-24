@@ -70,7 +70,7 @@ impl LoadingOverlay {
             let pattern = CString::new("sans:size=14:weight=500").ok()?;
             let font = (xft.XftFontOpenName)(display, screen, pattern.as_ptr());
             if font.is_null() {
-                eprintln!("[overlay] font load failed");
+                tracing::warn!("overlay font load failed");
                 return None;
             }
             let draw = (xft.XftDrawCreate)(display, window, visual, colormap);
@@ -148,7 +148,8 @@ impl LoadingOverlay {
             return;
         };
         let (_, _, w, h) = self.last_area.unwrap_or((0, 0, 400, 300));
-        let text = "Chargement…";
+        let text_owned = crate::i18n::t("common.loading");
+        let text = text_owned.as_str();
         unsafe {
             // Center the text. Use ascent for vertical baseline.
             let ascent = (*self.font).ascent;

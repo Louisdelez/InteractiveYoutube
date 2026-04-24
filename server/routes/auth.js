@@ -14,16 +14,16 @@ const router = express.Router();
 // Brute-force / credential-stuffing defence. bcrypt is CPU-bound (10
 // rounds ≈ 100 ms), so unrate-limited login is also a DoS vector.
 const loginLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 5,
+  windowMs: parseInt(process.env.AUTH_LOGIN_RATE_WINDOW_MS) || 15 * 60 * 1000,
+  max: parseInt(process.env.AUTH_LOGIN_RATE_MAX) || 5,
   standardHeaders: 'draft-7',
   legacyHeaders: false,
   message: { error: t('auth.error.rate_limit_login') },
 });
 
 const registerLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000,
-  max: 10,
+  windowMs: parseInt(process.env.AUTH_REGISTER_RATE_WINDOW_MS) || 60 * 60 * 1000,
+  max: parseInt(process.env.AUTH_REGISTER_RATE_MAX) || 10,
   standardHeaders: 'draft-7',
   legacyHeaders: false,
   message: { error: t('auth.error.rate_limit_register') },
@@ -37,7 +37,7 @@ const COOKIE_OPTIONS = {
   // GET cross-site, which we don't need). Tauri/desktop traffic
   // sets the cookie via the same origin handshake, unaffected.
   sameSite: 'strict',
-  maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+  maxAge: parseInt(process.env.JWT_COOKIE_MAX_AGE_MS) || 7 * 24 * 60 * 60 * 1000,
 };
 
 router.post('/register', registerLimiter, async (req, res) => {

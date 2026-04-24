@@ -1,6 +1,7 @@
 const jwt = require('jsonwebtoken');
 const config = require('../config');
 const { findUserById } = require('../db');
+const { t } = require('../i18n/fr');
 
 async function optionalAuth(req, res, next) {
   req.user = null;
@@ -19,7 +20,7 @@ async function optionalAuth(req, res, next) {
 async function requireAuth(req, res, next) {
   await optionalAuth(req, res, () => {
     if (!req.user) {
-      return res.status(401).json({ error: 'Authentication required' });
+      return res.status(401).json({ error: t('auth.error.not_authenticated') });
     }
     next();
   });

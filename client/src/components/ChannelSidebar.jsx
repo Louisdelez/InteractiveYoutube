@@ -164,7 +164,9 @@ export default function ChannelSidebar({
         key={`${keyPrefix}-${ch.id}`}
         ref={(el) => (itemRefs.current[i] = el)}
         className={`channel-item${ch.id === currentChannel ? ' active' : ''}${i === focusIndex ? ' focused' : ''}`}
-        title={`${ch.name}${isFav ? ' ★' : ''}\nClic droit: ${isFav ? 'retirer des' : 'ajouter aux'} favoris`}
+        title={isFav
+          ? t('sidebar.channel_tooltip.favorite', { name: ch.name })
+          : t('sidebar.channel_tooltip.not_favorite', { name: ch.name })}
         onClick={() => onChannelChange(ch.id)}
         onContextMenu={(e) => {
           e.preventDefault();
@@ -202,7 +204,7 @@ export default function ChannelSidebar({
           </>
         )}
         {showSections && (
-          <div className="channel-section-header" title="Toutes les chaînes">
+          <div className="channel-section-header" title={t('sidebar.all_channels_tooltip')}>
             <Tv size={12} />
           </div>
         )}

@@ -1,4 +1,5 @@
 import { memo } from 'react';
+import { t } from '../i18n';
 import './ChatMessage.css';
 
 // The server sends `time` pre-formatted in its own timezone so every
@@ -21,7 +22,7 @@ const ChatMessage = memo(function ChatMessage({ message }) {
         className={`chat-username ${message.registered ? 'chat-username-registered' : ''}`}
         style={{ color: message.color }}
       >
-        {message.registered && <span className="chat-badge" title="Compte verifie">&#9733;</span>}
+        {message.registered && <span className="chat-badge" title={t('chat.verified_tooltip')}>&#9733;</span>}
         {message.username}
       </span>
       {message.text.startsWith('[gif:') && message.text.endsWith(']')

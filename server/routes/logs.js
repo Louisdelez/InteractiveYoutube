@@ -13,6 +13,7 @@
 const express = require('express');
 const rateLimit = require('express-rate-limit');
 const log = require('../services/logger');
+const { t } = require('../i18n/fr');
 
 const router = express.Router();
 
@@ -29,7 +30,7 @@ const limiter = rateLimit({
   max: parseInt(process.env.LOG_RATE_MAX) || 120,
   standardHeaders: 'draft-7',
   legacyHeaders: false,
-  message: { error: 'log rate limit exceeded' },
+  message: { error: t('logs.error.rate_limit') },
 });
 
 function sanitizeEvent(raw, reqIp) {
@@ -72,7 +73,7 @@ router.post('/', limiter, express.json({ limit: '256kb' }), (req, res) => {
   const rawEvents = Array.isArray(body.events) ? body.events : [body];
 
   if (rawEvents.length === 0 || rawEvents.length > MAX_EVENTS_PER_BATCH) {
-    return res.status(400).json({ error: 'invalid batch size' });
+    return res.status(400).json({ error: t('logs.error.invalid_batch') });
   }
 
   let accepted = 0;

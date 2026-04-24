@@ -44,8 +44,8 @@ const REFRESH_TIMEOUT_MS = parseInt(process.env.MAINT_REFRESH_TIMEOUT_MS) || 60_
 // wedged — `server/socket/index.js` replays the current value on every
 // new connection. TTLs auto-clear stale state if anything crashes.
 const STATE_KEY = 'koala:maint:state';
-const STATE_WARNING_TTL_SECS = 15 * 60;
-const STATE_RUNNING_TTL_SECS = 15 * 60;
+const STATE_WARNING_TTL_SECS = parseInt(process.env.MAINT_STATE_WARNING_TTL_SECS) || 15 * 60;
+const STATE_RUNNING_TTL_SECS = parseInt(process.env.MAINT_STATE_RUNNING_TTL_SECS) || 15 * 60;
 
 const withTimeout = (p, label) =>
   Promise.race([

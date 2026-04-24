@@ -10,6 +10,7 @@ const { getIO } = require('../socket');
 const config = require('../config');
 const log = require('../services/logger');
 const { redis } = require('../services/redis');
+const { t } = require('../i18n/fr');
 const { createConnection } = require('../workers/bullmq-connection');
 const { QUEUE_NAME, JOB_DAILY, STATE_KEY } = require('../workers/daily-maintenance');
 
@@ -20,7 +21,7 @@ function loopbackOnly(req, res, next) {
   if (ip === '::1' || ip === '127.0.0.1' || ip === '::ffff:127.0.0.1') {
     return next();
   }
-  res.status(403).json({ error: 'loopback only' });
+  res.status(403).json({ error: t('admin.error.loopback_only') });
 }
 
 /**

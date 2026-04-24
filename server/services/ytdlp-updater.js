@@ -41,7 +41,10 @@ function download(url, dest, redirects = 0) {
       file.on('error', (err) => { fs.unlink(tmp, () => reject(err)); });
     });
     req.on('error', reject);
-    req.setTimeout(60_000, () => req.destroy(new Error('download timeout')));
+    req.setTimeout(
+      parseInt(process.env.YTDLP_DOWNLOAD_TIMEOUT_MS) || 60_000,
+      () => req.destroy(new Error('download timeout')),
+    );
   });
 }
 

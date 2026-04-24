@@ -41,7 +41,7 @@ export default function ChatPicker({ onEmojiSelect, onGifSelect, onStickerSelect
             theme="dark"
             height={310}
             width="100%"
-            searchPlaceholder="Rechercher..."
+            searchPlaceholder={t('common.search_placeholder')}
             previewConfig={{ showPreview: false }}
           />
         )}
@@ -91,13 +91,13 @@ function GifTab({ onSelect, onClose }) {
         type="text"
         value={query}
         onChange={handleSearch}
-        placeholder="Rechercher un GIF..."
+        placeholder={t('chat.gif_search_placeholder')}
       />
       <div className="cpicker-gif-grid">
         {loading ? (
           <div className="cpicker-empty">{t('common.loading')}</div>
         ) : gifs.length === 0 ? (
-          <div className="cpicker-empty">Aucun GIF trouve</div>
+          <div className="cpicker-empty">{t('chat.gif_not_found')}</div>
         ) : (
           gifs.map((g) => (
             <img
@@ -114,7 +114,7 @@ function GifTab({ onSelect, onClose }) {
           ))
         )}
       </div>
-      <div className="cpicker-tenor">Powered by Tenor</div>
+      <div className="cpicker-tenor">{t('chat.tenor_credit')}</div>
     </div>
   );
 }
@@ -157,7 +157,7 @@ function StickerTab({ onSelect, onClose }) {
 
   return (
     <div className="cpicker-stickers">
-      <div className="cpicker-stickers-count">{stickers.length} sticker(s)</div>
+      <div className="cpicker-stickers-count">{t('chat.sticker_count', { count: stickers.length })}</div>
       <div className="cpicker-stickers-grid">
         {stickers.map((name) => (
           <div

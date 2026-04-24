@@ -158,13 +158,15 @@ const checkCron = withLatency('cron', async () => {
   try {
     const stat = fs.statSync(CRON_LOG_PATH);
     const ageHours = (Date.now() - stat.mtimeMs) / 3600_000;
-    if (ageHours > 26) {
+    const downHours = parseFloat(process.env.STATUS_CRON_DOWN_HOURS) || 26;
+    const degradedHours = parseFloat(process.env.STATUS_CRON_DEGRADED_HOURS) || 25;
+    if (ageHours > downHours) {
       return {
         status: 'down',
         message: `last update ${ageHours.toFixed(1)}h ago — next cron missed`,
       };
     }
-    if (ageHours > 25) {
+    if (ageHours > degradedHours) {
       return { status: 'degraded', message: `last update ${ageHours.toFixed(1)}h ago` };
     }
     return { status: 'operational', message: `last run ${ageHours.toFixed(1)}h ago` };
@@ -187,7 +189,8 @@ const checkYtdlp = withLatency('ytdlp', async () => {
   }
   const stat = fs.statSync(binPath);
   const ageDays = (Date.now() - stat.mtimeMs) / 86_400_000;
-  if (ageDays > 14) {
+  const ytdlpDegradedDays = parseFloat(process.env.STATUS_YTDLP_DEGRADED_DAYS) || 14;
+  if (ageDays > ytdlpDegradedDays) {
     return { status: 'degraded', message: `binary ${ageDays.toFixed(0)}d old` };
   }
   return { status: 'operational', message: `updated ${ageDays.toFixed(1)}d ago` };
@@ -223,8 +226,10 @@ const checkDisk = withLatency('disk', async () => {
   const pctFree = (freeBytes / totalBytes) * 100;
   const gbFree = freeBytes / 1_073_741_824;
   const msg = `${gbFree.toFixed(0)} GB free (${pctFree.toFixed(0)}%)`;
-  if (pctFree < 5) return { status: 'down', message: msg };
-  if (pctFree < 15) return { status: 'degraded', message: msg };
+  const diskDownPct = parseFloat(process.env.STATUS_DISK_DOWN_PCT) || 5;
+  const diskDegradedPct = parseFloat(process.env.STATUS_DISK_DEGRADED_PCT) || 15;
+  if (pctFree < diskDownPct) return { status: 'down', message: msg };
+  if (pctFree < diskDegradedPct) return { status: 'degraded', message: msg };
   return { status: 'operational', message: msg };
 });
 
@@ -313,7 +318,7 @@ function startCollector() {
     pruneOldChecks().catch((err) =>
       log.warn({ err: err.message }, 'status prune failed')
     );
-  }, 24 * 3600 * 1000);
+  }, parseInt(process.env.STATUS_PRUNE_INTERVAL_MS) || 24 * 3600 * 1000);
 }
 
 function stopCollector() {

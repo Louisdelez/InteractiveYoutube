@@ -117,7 +117,7 @@ export default function Chat({ channelId }) {
             type="button"
             className={`chat-emoji-btn ${showPicker ? 'chat-emoji-btn-active' : ''}`}
             onClick={() => setShowPicker(!showPicker)}
-            title="Emoji, GIF & Stickers"
+            title={t('chat.picker.button_tooltip')}
           >
             <SmilePlus size={18} />
           </button>
@@ -130,7 +130,7 @@ export default function Chat({ channelId }) {
             maxLength={500}
           />
           <button type="submit" className="chat-send-btn" disabled={!input.trim()}>
-            Chat
+            {t('chat.send_label')}
           </button>
         </form>
       </div>

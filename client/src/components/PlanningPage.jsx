@@ -284,7 +284,7 @@ export default function PlanningPage({ onBack, channelId, channels }) {
                   <div className="pl-day-header">
                     <span className="pl-day-name">{DAY_NAMES_SHORT[i]}</span>
                     <span className="pl-day-date">{fmtDay(day)}</span>
-                    {isToday && <span className="pl-day-today-badge">Aujourd'hui</span>}
+                    {isToday && <span className="pl-day-today-badge">{t('planning.today_badge_lower')}</span>}
                   </div>
                   <div
                     className="pl-day-column"

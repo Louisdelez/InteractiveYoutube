@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Subtitles } from 'lucide-react';
+import { t } from '../i18n';
 import './CaptionsControl.css';
 
 export default function CaptionsControl({ playerRef, videoId }) {
@@ -77,7 +78,7 @@ export default function CaptionsControl({ playerRef, videoId }) {
       <button
         className={`captions-btn${activeTrack ? ' active' : ''}`}
         onClick={() => setOpen(!open)}
-        title="Sous-titres"
+        title={t('player.captions_toggle_tooltip')}
       >
         <Subtitles size={18} />
       </button>
@@ -87,7 +88,7 @@ export default function CaptionsControl({ playerRef, videoId }) {
             className={`captions-option${activeTrack === null ? ' selected' : ''}`}
             onClick={() => handleSelect(null)}
           >
-            Désactivés
+            {t('player.captions_disabled')}
           </button>
           <div className="captions-divider" />
           {tracks.map((track) => (

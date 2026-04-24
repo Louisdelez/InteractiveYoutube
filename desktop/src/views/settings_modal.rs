@@ -117,10 +117,7 @@ impl Render for SettingsModal {
                         div()
                             .text_xs()
                             .text_color(rgb(0x9b9b9e))
-                            .child(
-                                "Garde N chaînes en mémoire pour zapper sans temps de chargement. \
-                                 Inclut la chaîne actuelle."
-                            ),
+                            .child(crate::i18n::t("settings.memory.description")),
                     )
                     // Option pills
                     .child(
@@ -207,10 +204,7 @@ impl Render for SettingsModal {
                         div()
                             .text_xs()
                             .text_color(rgb(0x9b9b9e))
-                            .child(
-                                "Qualité maximale du flux haute résolution. \
-                                 N'affecte pas la vitesse de zap (le flux 360p rapide mène toujours)."
-                            ),
+                            .child(crate::i18n::t("settings.quality.description")),
                     )
                     .child(
                         div()

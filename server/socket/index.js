@@ -29,12 +29,12 @@ const ipKey = (ip) => `iy:ip:${ip}`;
 // rapides (F5, kill -9 du desktop) ne décrémentent pas toujours le
 // compteur ; un TTL court garantit qu'on ne bloque pas sa propre
 // session pendant 1 h après 10 restarts consécutifs.
-const MAX_CONNECTIONS_PER_IP = 30;
-const IP_TTL_SECS = 600;
+const MAX_CONNECTIONS_PER_IP = parseInt(process.env.SOCKET_MAX_CONNECTIONS_PER_IP) || 30;
+const IP_TTL_SECS = parseInt(process.env.SOCKET_IP_TTL_SECS) || 600;
 
 // Per-socket throttle for tv:switchChannel — prevents Redis thrash
 // when a user spams channel buttons.
-const SWITCH_DEBOUNCE_MS = 400;
+const SWITCH_DEBOUNCE_MS = parseInt(process.env.SOCKET_SWITCH_DEBOUNCE_MS) || 400;
 
 async function emitViewerCount(channelId) {
   const count = await redis.scard(viewerSetKey(channelId));

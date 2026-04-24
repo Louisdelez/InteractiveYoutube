@@ -1,11 +1,12 @@
 const express = require('express');
 const config = require('../config');
+const { t } = require('../i18n/fr');
 
 const router = express.Router();
 
-const TENOR_BASE = 'https://g.tenor.com/v2';
-const MEDIA_FILTER = 'gif,tinygif,nanogif';
-const LIMIT = 30;
+const TENOR_BASE = process.env.TENOR_API_BASE || 'https://g.tenor.com/v2';
+const MEDIA_FILTER = process.env.TENOR_MEDIA_FILTER || 'gif,tinygif,nanogif';
+const LIMIT = parseInt(process.env.TENOR_RESULT_LIMIT) || 30;
 
 function mapResults(results) {
   return (results || []).map((r) => {
@@ -26,7 +27,7 @@ router.get('/trending', async (req, res) => {
   try {
     const url = `${TENOR_BASE}/featured?key=${config.TENOR_API_KEY}&limit=${LIMIT}&media_filter=${MEDIA_FILTER}&contentfilter=medium`;
     const resp = await fetch(url);
-    if (!resp.ok) return res.status(502).json({ error: `Tenor ${resp.status}` });
+    if (!resp.ok) return res.status(502).json({ error: t('gif.error.tenor_http').replace('{status}', resp.status) });
     const data = await resp.json();
     res.json(mapResults(data.results));
   } catch (err) {
@@ -40,7 +41,7 @@ router.get('/search', async (req, res) => {
   try {
     const url = `${TENOR_BASE}/search?key=${config.TENOR_API_KEY}&q=${encodeURIComponent(q)}&limit=${LIMIT}&media_filter=${MEDIA_FILTER}&contentfilter=medium`;
     const resp = await fetch(url);
-    if (!resp.ok) return res.status(502).json({ error: `Tenor ${resp.status}` });
+    if (!resp.ok) return res.status(502).json({ error: t('gif.error.tenor_http').replace('{status}', resp.status) });
     const data = await resp.json();
     res.json(mapResults(data.results));
   } catch (err) {

@@ -163,8 +163,8 @@ impl PlayerView {
                 .into_iter()
                 .find(|(tid, _)| *tid == sid)
                 .map(|(_, l)| l)
-                .unwrap_or_else(|| "On".to_string()),
-            None => "Off".to_string(),
+                .unwrap_or_else(|| crate::i18n::t("player.captions_on")),
+            None => crate::i18n::t("player.captions_off"),
         };
     }
 

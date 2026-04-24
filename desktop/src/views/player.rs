@@ -442,7 +442,7 @@ impl PlayerView {
             );
 
             Self {
-                title: "Chargement...".to_string(),
+                title: crate::i18n::t("common.loading"),
                 published_at: None,
                 mpv,
                 current_url: String::new(),

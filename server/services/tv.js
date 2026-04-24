@@ -7,7 +7,7 @@ const priorityQueues = new Map(); // channelId -> []
 const lastVideoIds = new Map(); // channelId -> videoId
 const priorityState = new Map(); // channelId -> { playing, startedAt }
 
-const CACHE_TTL_MS = 1000;
+const CACHE_TTL_MS = parseInt(process.env.TV_STATE_CACHE_TTL_MS) || 1000;
 
 function queuePriorityVideo(channelId, video) {
   if (!priorityQueues.has(channelId)) priorityQueues.set(channelId, []);

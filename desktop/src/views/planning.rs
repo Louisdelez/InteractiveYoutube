@@ -618,9 +618,11 @@ impl PlanningView {
                             .text_xs()
                             .font_weight(FontWeight::BOLD)
                             .text_color(if is_today { rgb(0xefddff) } else { rgb(0xc8c8cc) })
-                            .child(
-                                ["LUN", "MAR", "MER", "JEU", "VEN", "SAM", "DIM"][i].to_string(),
-                            ),
+                            .child({
+                                let days_short = crate::i18n::t("date.days.short");
+                                let days: Vec<&str> = days_short.split(',').collect();
+                                days.get(i).copied().unwrap_or("").to_string()
+                            }),
                     )
                     .child(
                         div()
@@ -700,7 +702,7 @@ impl PlanningView {
                                 .mt(px(2.0))
                                 .text_xs()
                                 .font_weight(FontWeight::BOLD)
-                                .child("● EN DIRECT"),
+                                .child(crate::i18n::t("planning.live_indicator")),
                         );
                     }
                     body = body.child(block);
