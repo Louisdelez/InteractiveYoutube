@@ -326,7 +326,7 @@ impl Render for AppView {
                                     .text_xs()
                                     .text_color(rgb(0xffffff))
                                     .font_weight(FontWeight::SEMIBOLD)
-                                    .child("Connexion")
+                                    .child(crate::i18n::t("topbar.connect.label"))
                                     .on_click(cx.listener(|this, _ev: &ClickEvent, window, cx| {
                                         this.open_auth(window, cx);
                                     }))
@@ -547,7 +547,7 @@ impl Render for AppView {
                                     div()
                                         .text_sm()
                                         .text_color(rgb(0xaaaaaa))
-                                        .child("L'application sera disponible dans quelques instants...")
+                                        .child(crate::i18n::t("status.service_starting"))
                                 )
                         )
                         .occlude(),

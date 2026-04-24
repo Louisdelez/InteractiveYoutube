@@ -469,7 +469,7 @@ impl PlayerView {
                 quality_idx: 0, // Auto
                 captions_on: false,
                 volume: 100,
-                sub_label: "Off".to_string(),
+                sub_label: crate::i18n::t("player.captions_off"),
                 audio_label: "—".to_string(),
                 volume_state,
                 icons: IconCache::new(),

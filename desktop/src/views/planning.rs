@@ -320,7 +320,7 @@ impl Render for PlanningView {
                 if let Some(ic) = back_icon {
                     btn = btn.child(img(ic).w(px(14.0)).h(px(14.0)));
                 }
-                btn.child("Retour")
+                btn.child(crate::i18n::t("status.back"))
             })
             .child(
                 div()
@@ -639,7 +639,7 @@ impl PlanningView {
                             .rounded(px(999.0))
                             .bg(rgb(0x9b59b6))
                             .text_color(rgb(0xffffff))
-                            .child("AUJOURD'HUI"),
+                            .child(crate::i18n::t("planning.today_badge")),
                     );
                 }
 

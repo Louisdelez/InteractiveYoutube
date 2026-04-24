@@ -281,7 +281,7 @@ impl Render for PlayerView {
                     if let Some(icon) = yt_icon {
                         link = link.child(img(icon).w(px(16.0)).h(px(16.0)));
                     }
-                    bar = bar.child(link.child(div().child("Voir sur YouTube")));
+                    bar = bar.child(link.child(div().child(crate::i18n::t("player.watch_on_youtube"))));
                 }
                 bar
             })

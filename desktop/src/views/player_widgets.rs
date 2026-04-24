@@ -84,7 +84,7 @@ pub fn loading_indicator() -> impl IntoElement {
             div()
                 .text_xs()
                 .text_color(rgb(crate::theme::colors::TEXT_MUTED))
-                .child("Chargement…"),
+                .child(crate::i18n::t("common.loading")),
         )
 }
 

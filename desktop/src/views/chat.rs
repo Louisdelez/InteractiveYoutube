@@ -824,7 +824,7 @@ impl Render for ChatView {
                                 .text_color(rgb(0xffffff))
                                 .cursor_pointer()
                                 .hover(|this| this.bg(rgb(0xac6dc7)))
-                                .child("Chat")
+                                .child(crate::i18n::t("chat.send"))
                                 .on_click(cx.listener(move |_this: &mut ChatView, _, _window, cx| {
                                     let text = input_handle.read(cx).text().trim().to_string();
                                     if text.is_empty() { return; }
