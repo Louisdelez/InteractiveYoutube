@@ -41,9 +41,15 @@ pub(super) fn channel_click(
                 }
             }
             // Clear local chat immediately so messages from the
-            // previous channel disappear during the switch.
+            // previous channel disappear during the switch. Use
+            // `clear_messages` (unconditional) rather than
+            // `replace_messages(Vec::new(), ...)` — the latter has an
+            // anti-reconnect guard that ignores empty histories when
+            // local state is non-empty, which silently swallows the
+            // intended clear and leaves the old channel's chat on
+            // screen until the server round-trip brings a new one.
             this.chat.update(cx, |c, cx| {
-                c.replace_messages(Vec::new(), cx);
+                c.clear_messages(cx);
                 cx.notify();
             });
             // Optimistic instant switch: if we have a recent
