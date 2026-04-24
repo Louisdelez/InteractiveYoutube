@@ -74,14 +74,28 @@ function saveToDisk(channelId) {
 
 function loadFromDisk(channelId) {
   const filePath = getPlaylistPath(channelId);
-  if (fs.existsSync(filePath)) {
-    const state = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
-    state.prefixSums = buildPrefixSums(state.videos);
-    playlists.set(channelId, state);
-    log.info({ channelId, videos: state.videos.length }, 'loaded from disk');
-    return true;
+  if (!fs.existsSync(filePath)) return false;
+  const state = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+  // Legacy / corrupt JSON guard. A file missing the timing fields
+  // would compute `elapsedSec = (now - undefined) % undefined = NaN`
+  // in getTvState, serialize to `"seekTo": null`, and crash the Rust
+  // client's f64 deserialization → channel appears dead. Caught here
+  // so initAllPlaylists falls through to buildPlaylist and rebuilds
+  // from the YouTube API.
+  const bad =
+    !Array.isArray(state.videos) ||
+    state.videos.length === 0 ||
+    typeof state.tvStartedAt !== 'number' ||
+    typeof state.totalDuration !== 'number' ||
+    !Number.isFinite(state.totalDuration);
+  if (bad) {
+    log.warn({ channelId, filePath }, 'playlist: disk state malformed, rebuilding from API');
+    return false;
   }
-  return false;
+  state.prefixSums = buildPrefixSums(state.videos);
+  playlists.set(channelId, state);
+  log.info({ channelId, videos: state.videos.length }, 'loaded from disk');
+  return true;
 }
 
 /**
