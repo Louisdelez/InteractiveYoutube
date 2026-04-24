@@ -19,71 +19,55 @@
  */
 const config = require('../config');
 const log = require('../services/logger');
-const { fetchVideoDetails } = require('../services/youtube');
-const { checkForNewUploads } = require('../services/rss');
 const { addNewVideos } = require('../services/playlist');
 const { getEmitter } = require('./io-emitter');
 const pubsub = require('../services/pubsub');
 
-const POPCORN_MIN_DURATION = 5400; // 1 h 30 (same as the old cron)
-
-async function pollNormalChannel(channel) {
-  let newIds = [];
-  for (const ytId of channel.youtubeChannelIds) {
-    const ids = await checkForNewUploads(channel.id, ytId);
-    newIds = newIds.concat(ids);
-  }
-  newIds = [...new Set(newIds)];
-  if (newIds.length === 0) return;
-
-  const newVideos = await fetchVideoDetails(newIds);
+/**
+ * Poll one channel for new videos via its RSS feed. Each channel
+ * implements `pollRss()` polymorphically:
+ *   - NormalChannel          : uploads RSS for each underlying YouTube
+ *                              channel ID (NEW → inject as priority +
+ *                              tv:newRelease).
+ *   - OrderedPlaylistChannel : optional RSS (only if `rssChannelId`
+ *                              configured, e.g. Popcorn) with a title
+ *                              pattern + min-duration filter. No
+ *                              priority injection, just a playlist-
+ *                              reload notification (ordered channels
+ *                              don't carry a priority queue concept).
+ *   - FixedVideoChannel      : `pollRss()` returns [] — static
+ *                              playlists never grow.
+ */
+async function pollChannel(channel) {
+  const newVideos = await channel.pollRss();
   if (newVideos.length === 0) return;
 
   addNewVideos(channel.id, newVideos);
   await pubsub.publish(pubsub.CHANNELS.PLAYLIST_RELOAD, { channelId: channel.id });
 
   const emitter = getEmitter();
-  for (const video of newVideos) {
-    await pubsub.publish(pubsub.CHANNELS.PRIORITY_VIDEO, { channelId: channel.id, video });
+
+  // Normal channels inject each new video as a priority (plays next in
+  // rotation). Ordered channels don't — their order is curated.
+  if (channel.kind === 'normal') {
+    for (const video of newVideos) {
+      await pubsub.publish(pubsub.CHANNELS.PRIORITY_VIDEO, { channelId: channel.id, video });
+    }
   }
+
   emitter.emit('tv:playlistUpdated', { channelId: channel.id });
   emitter.emit('tv:newRelease', { channelId: channel.id, count: newVideos.length });
 
-  log.info({ channel: channel.id, count: newVideos.length }, 'rss: new videos injected');
-}
-
-async function pollOrderedChannel(channel) {
-  // Only Popcorn is currently ordered-with-RSS. Fixed-video channels
-  // (noob) never get RSS treatment — their playlist is static.
-  const popcornYtChannelId = 'UCnyR4T5qpgOrWGcQU6Jinkw';
-  const newIds = await checkForNewUploads(channel.id, popcornYtChannelId);
-  if (newIds.length === 0) return;
-
-  const newVideos = await fetchVideoDetails(newIds, { skipShortsFilter: true });
-  const popcornEpisodes = newVideos.filter(
-    (v) => /popcorn/i.test(v.title) && v.duration >= POPCORN_MIN_DURATION
+  log.info(
+    { channel: channel.id, kind: channel.kind, count: newVideos.length },
+    'rss: new videos injected'
   );
-  if (popcornEpisodes.length === 0) return;
-
-  addNewVideos(channel.id, popcornEpisodes);
-  await pubsub.publish(pubsub.CHANNELS.PLAYLIST_RELOAD, { channelId: channel.id });
-
-  const emitter = getEmitter();
-  emitter.emit('tv:playlistUpdated', { channelId: channel.id });
-  emitter.emit('tv:newRelease', { channelId: channel.id, count: popcornEpisodes.length });
-
-  log.info({ channel: channel.id, count: popcornEpisodes.length }, 'rss: popcorn episodes added');
 }
 
 async function pollOnce() {
   for (const channel of config.CHANNELS) {
     try {
-      if (channel.ordered && channel.youtubePlaylists) {
-        await pollOrderedChannel(channel);
-      } else if (!channel.ordered) {
-        await pollNormalChannel(channel);
-      }
-      // Fixed-ordered channels (noob) intentionally have no RSS
+      await pollChannel(channel);
     } catch (err) {
       log.error({ channel: channel.id, err: err.message }, 'rss poll: channel failed');
     }

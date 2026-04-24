@@ -95,104 +95,52 @@ function reloadFromDisk(channelId) {
 }
 
 async function buildPlaylist(channelId, channel) {
-  if (channel.ordered && channel.fixedVideoIds) {
-    // Fixed video list (e.g., Noob: specific videos in order)
-    log.info({ channelId, source: 'fixed', count: channel.fixedVideoIds.length }, 'building ordered playlist');
-    const allVideoIds = channel.fixedVideoIds;
-    const videos = await fetchVideoDetails(allVideoIds, { skipShortsFilter: true, skipLiveFilter: true });
-
-    if (videos.length === 0) {
-      throw new Error(`No embeddable videos found for channel ${channelId}`);
-    }
-
-    const totalDuration = videos.reduce((sum, v) => sum + v.duration, 0);
-
-    const state = {
-      tvStartedAt: Date.now(),
-      totalDuration,
-      channelId,
-      ordered: true,
-      videos,
-      prefixSums: buildPrefixSums(videos),
-      lastRefresh: Date.now(),
-    };
-
-    playlists.set(channelId, state);
-    saveToDisk(channelId);
-    return state;
-  }
-
-  if (channel.ordered && channel.youtubePlaylists) {
-    log.info({ channelId, source: 'playlists', count: channel.youtubePlaylists.length }, 'building ordered playlist');
-    const allVideoIds = await fetchOrderedVideoIds(channel.youtubePlaylists);
-    // For ordered: don't filter shorts via HEAD (these are curated playlists)
-    // But still fetch details for duration and embeddable check
-    const videos = await fetchVideoDetails(allVideoIds, { skipShortsFilter: true, skipLiveFilter: true });
-
-    if (videos.length === 0) {
-      throw new Error(`No embeddable videos found for channel ${channelId}`);
-    }
-
-    const totalDuration = videos.reduce((sum, v) => sum + v.duration, 0);
-
-    const state = {
-      tvStartedAt: Date.now(),
-      totalDuration,
-      channelId,
-      ordered: true,
-      videos, // Keep original order, no shuffle
-      prefixSums: buildPrefixSums(videos),
-      lastRefresh: Date.now(),
-    };
-
-    playlists.set(channelId, state);
-    saveToDisk(channelId);
-    return state;
-  }
-
-  // Normal channel: fetch from YouTube channel uploads + shuffle
-  const youtubeChannelIds = channel.youtubeChannelIds;
-  log.info({ channelId, sources: youtubeChannelIds.length }, 'building from YouTube');
-  let allVideoIds = [];
-  for (const ytId of youtubeChannelIds) {
-    const ids = await fetchAllVideoIds(ytId);
-    allVideoIds = allVideoIds.concat(ids);
-  }
-  // Also fetch from extra playlists (e.g., EGO's unlisted old videos)
-  if (channel.extraPlaylists) {
-    for (const plId of channel.extraPlaylists) {
-      const ids = await fetchOrderedVideoIds([plId]);
-      allVideoIds = allVideoIds.concat(ids);
-    }
-  }
-  allVideoIds = [...new Set(allVideoIds)];
+  log.info({ channelId, kind: channel.kind }, 'building playlist');
+  const allVideoIds = await channel.fetchVideoIds();
   log.info({ channelId, uniqueIds: allVideoIds.length }, 'collected video IDs');
-  const videos = await fetchVideoDetails(allVideoIds, {
-    skipLiveFilter: !!channel.includeLives,
-  });
+  const videos = await fetchVideoDetails(allVideoIds, channel.detailsOpts);
 
   if (videos.length === 0) {
     throw new Error(`No embeddable videos found for channel ${channelId}`);
   }
 
-  const seed = Date.now();
-  const shuffled = seededShuffle(videos, seed);
-  const totalDuration = shuffled.reduce((sum, v) => sum + v.duration, 0);
-
-  const state = {
-    tvStartedAt: Date.now(),
-    seed,
-    totalDuration,
-    channelId,
-    youtubeChannelIds,
-    videos: shuffled,
-    prefixSums: buildPrefixSums(shuffled),
-    lastRefresh: Date.now(),
-  };
+  // Normal channels get a seeded shuffle so the order varies run-to-run
+  // but each playback session is deterministic against its `seed`.
+  // Ordered channels keep the fetch order (curated intent).
+  const state = channel.shuffle
+    ? buildShuffledState(channelId, videos, channel)
+    : buildOrderedState(channelId, videos);
 
   playlists.set(channelId, state);
   saveToDisk(channelId);
   return state;
+}
+
+function buildShuffledState(channelId, videos, channel) {
+  const seed = Date.now();
+  const shuffled = seededShuffle(videos, seed);
+  return {
+    tvStartedAt: Date.now(),
+    seed,
+    totalDuration: shuffled.reduce((sum, v) => sum + v.duration, 0),
+    channelId,
+    youtubeChannelIds: channel.youtubeChannelIds,
+    videos: shuffled,
+    prefixSums: buildPrefixSums(shuffled),
+    lastRefresh: Date.now(),
+  };
+}
+
+function buildOrderedState(channelId, videos) {
+  return {
+    tvStartedAt: Date.now(),
+    totalDuration: videos.reduce((sum, v) => sum + v.duration, 0),
+    channelId,
+    ordered: true,
+    videos,
+    prefixSums: buildPrefixSums(videos),
+    lastRefresh: Date.now(),
+  };
 }
 
 async function initAllPlaylists() {
@@ -246,22 +194,10 @@ function mergePlaylistPreservingTimecode(oldState, freshVideoDetails) {
 }
 
 async function fetchFreshVideoIdsForChannel(channel) {
-  if (channel.ordered && channel.fixedVideoIds) {
-    return channel.fixedVideoIds;
-  }
-  if (channel.ordered && channel.youtubePlaylists) {
-    return await fetchOrderedVideoIds(channel.youtubePlaylists);
-  }
-  let ids = [];
-  for (const ytId of channel.youtubeChannelIds || []) {
-    ids = ids.concat(await fetchAllVideoIds(ytId));
-  }
-  if (channel.extraPlaylists) {
-    for (const plId of channel.extraPlaylists) {
-      ids = ids.concat(await fetchOrderedVideoIds([plId]));
-    }
-  }
-  return [...new Set(ids)];
+  // `fetchVideoIds` on the polymorphic channel object already handles
+  // the per-kind dispatch (shuffle channel uploads for normal, playlist
+  // concatenation for ordered, fixed array for fixed-video).
+  return await channel.fetchVideoIds();
 }
 
 async function refreshPlaylist(channelId) {
@@ -299,10 +235,7 @@ async function refreshPlaylist(channelId) {
         return oldState;
       }
 
-      const trulyNewVideos = await fetchVideoDetails(trulyNewIds, {
-        skipShortsFilter: !!channel.ordered,
-        skipLiveFilter: !!channel.ordered || !!channel.includeLives,
-      });
+      const trulyNewVideos = await fetchVideoDetails(trulyNewIds, channel.detailsOpts);
 
       const { state: newState, added } = mergePlaylistPreservingTimecode(
         oldState, trulyNewVideos

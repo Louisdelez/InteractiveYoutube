@@ -59,8 +59,11 @@ const config = {
   //                        videos are concatenated in listing order.
   //
   // Edit the JSON file to add / remove / reorder channels. No code change
-  // needed in this file to list a new chaîne.
-  CHANNELS: require('./config/channels.json'),
+  // needed in this file to list a new chaîne. `loadAll` wraps each raw
+  // entry in the appropriate `Channel` subclass so the rest of the
+  // codebase iterates polymorphically (no `if (channel.ordered && …)`
+  // dispatch — channel.fetchVideoIds() / channel.pollRss() instead).
+  CHANNELS: require('./models/channel').loadAll(require('./config/channels.json')),
 };
 
 const required = [
