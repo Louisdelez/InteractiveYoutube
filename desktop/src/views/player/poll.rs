@@ -85,6 +85,14 @@ pub(super) fn start(
                                         mpv_try!(p.mpv.set_property("mute", false), "main unmute (post first-frame)");
                                         fade_volume(p.mpv.clone(), 0, 100, 200, cx);
                                     }
+                                    // Channel-switch snapshot : whenever
+                                    // main mpv has its first frame, the
+                                    // static thumbnail can go away —
+                                    // real video is ready to take over.
+                                    if just_became_ready && p.switching_snapshot.is_some() {
+                                        p.clear_snapshot();
+                                        cx.notify();
+                                    }
 
                                     // If a channel switch is pending,
                                     // poll backup for first-frame
@@ -109,6 +117,10 @@ pub(super) fn start(
                                             p.cache_stall_since = None;
                                             p.backup_since = Some(std::time::Instant::now());
                                             p.pending_backup_reveal = false;
+                                            // Backup just became the
+                                            // visible source — snapshot
+                                            // no longer needed.
+                                            p.clear_snapshot();
                                             cx.notify();
                                         }
                                     }

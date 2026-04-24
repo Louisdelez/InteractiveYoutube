@@ -8,6 +8,60 @@
 //! `.upgrade().update(cx, |app, _| …)` dance.
 
 use super::*;
+use crate::services::frame_cache;
+
+/// Fetch a single YouTube thumbnail for a favorite channel's current
+/// videoId. Inserts into `AppView::frame_cache` on success. Silent
+/// on failure — if the network hiccups or YouTube returns a 404 for
+/// this particular video, we just don't have a snapshot for it and
+/// the click falls back to the existing "previous frame frozen"
+/// behaviour. No retries; the next auto-advance (or favorite
+/// re-toggle) will try again.
+///
+/// Deduplicates via the cache's `needs_refresh` — if the cache
+/// already has this exact videoId for this channel, we skip the fetch
+/// entirely. Cheap to call from the dispatch hook on every tv:state /
+/// tv:sync without flooding img.youtube.com.
+pub fn fetch_snapshot(
+    entity: WeakEntity<AppView>,
+    channel_id: String,
+    video_id: String,
+    cx: &mut Context<AppView>,
+) {
+    cx.spawn(async move |_, cx| {
+        let (tx, rx) = std::sync::mpsc::channel::<Option<Vec<u8>>>();
+        let vid = video_id.clone();
+        std::thread::spawn(move || {
+            let _ = tx.send(frame_cache::fetch_thumbnail_bytes(&vid));
+        });
+        // Poll every 100 ms until the blocking fetch returns (typical
+        // img.youtube.com fetch is 100-500 ms on a reasonable
+        // connection).
+        loop {
+            match rx.try_recv() {
+                Ok(Some(bytes)) if !bytes.is_empty() => {
+                    let format = frame_cache::guess_format(&bytes);
+                    let image = std::sync::Arc::new(Image::from_bytes(format, bytes));
+                    if let Some(e) = entity.upgrade() {
+                        let _ = cx.update(|cx| {
+                            e.update(cx, |app: &mut AppView, cx| {
+                                app.frame_cache.insert(channel_id.clone(), video_id.clone(), image);
+                                cx.notify();
+                            });
+                        });
+                    }
+                    return;
+                }
+                Ok(_) => return, // empty / None — give up silently
+                Err(std::sync::mpsc::TryRecvError::Empty) => {
+                    cx.background_executor().timer(Duration::from_millis(100)).await;
+                }
+                Err(std::sync::mpsc::TryRecvError::Disconnected) => return,
+            }
+        }
+    })
+    .detach();
+}
 
 /// Channels fetch + avatar download + badge refresh. ~100 LOC.
 pub(super) fn channels_and_avatars(

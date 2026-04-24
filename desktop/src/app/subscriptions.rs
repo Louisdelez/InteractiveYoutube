@@ -52,6 +52,18 @@ pub(super) fn channel_click(
                 c.clear_messages(cx);
                 cx.notify();
             });
+            // Instant visual feedback: if this favorite has a
+            // pre-fetched thumbnail cached in memory, paint it over
+            // the video area while mpv (main + backup) spin up their
+            // first frame. Cleared by the poll loop as soon as
+            // either becomes the visible surface. Non-favorites fall
+            // through (cache miss) — the mpv-based zap still fires
+            // and the previous frame stays visible for ~100 ms.
+            #[cfg(target_os = "linux")]
+            if let Some(entry) = this.frame_cache.get(&event.channel_id) {
+                let image = entry.image.clone();
+                this.player.update(cx, |p, _| p.show_snapshot(image));
+            }
             // Optimistic instant switch: if we have a recent
             // tv:state cached for the target channel, rebase
             // seek_to by elapsed wall-clock and call load_state
@@ -225,9 +237,14 @@ pub(super) fn badge_favorite(
             let favs = this.settings.favorites.clone();
             let is_fav = favs.contains(&id);
             this.sidebar.update(cx, |s, cx| {
-                s.set_favorites(favs);
+                s.set_favorites(favs.clone());
                 cx.notify();
             });
+            // Keep the frame-snapshot cache scoped to favorites only.
+            // Newly-added favorite → fetch its thumbnail now (we
+            // already know the videoId from last_state_per_channel).
+            // Newly-removed → drop the decoded Image to free RAM.
+            sync_frame_cache_to_favorites(this, &id, is_fav, cx);
             // Refresh the badge so the star icon flips state.
             let name = this
                 .sidebar
@@ -247,6 +264,30 @@ pub(super) fn badge_favorite(
     )
 }
 
+/// Shared logic for both badge + sidebar favorite toggles : after
+/// favorites change, evict the dropped one from the frame cache (free
+/// RAM) or fetch a snapshot for the newly-added one.
+fn sync_frame_cache_to_favorites(
+    this: &mut AppView,
+    toggled_channel: &str,
+    now_favorite: bool,
+    cx: &mut Context<AppView>,
+) {
+    let favs = this.settings.favorites.clone();
+    this.frame_cache.evict_non_favorites(&favs);
+    if now_favorite {
+        if let Some(state) = this.last_state_per_channel.get(toggled_channel) {
+            let video_id = state.video_id.clone();
+            super::background_tasks::fetch_snapshot(
+                cx.entity().downgrade(),
+                toggled_channel.to_string(),
+                video_id,
+                cx,
+            );
+        }
+    }
+}
+
 /// Sidebar right-click → toggle favourite.
 pub(super) fn sidebar_favorite(
     sidebar: &Entity<SidebarView>,
@@ -259,15 +300,17 @@ pub(super) fn sidebar_favorite(
             if let Some(pos) = this.settings.favorites.iter().position(|x| x == &id) {
                 this.settings.favorites.remove(pos);
             } else {
-                this.settings.favorites.push(id);
+                this.settings.favorites.push(id.clone());
             }
             settings::save(&this.settings);
             spawn_push_user_settings(this.settings.clone());
             let favs = this.settings.favorites.clone();
+            let is_fav = favs.iter().any(|f| f == &id);
             this.sidebar.update(cx, |s, cx| {
                 s.set_favorites(favs);
                 cx.notify();
             });
+            sync_frame_cache_to_favorites(this, &id, is_fav, cx);
         },
     )
 }

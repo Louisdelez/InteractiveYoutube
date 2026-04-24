@@ -33,10 +33,24 @@ impl Render for PlayerView {
             let chat_w = if self.chat_open { CHAT_W } else { 0.0 };
             let w = (f32::from(vs.width) - SIDEBAR_W - chat_w).max(100.0) as u32;
             let h = (f32::from(vs.height) - TOPBAR_H - CONTROL_BAR_H - INFOBAR_H).max(100.0) as u32;
+            // Snapshot window: if a snapshot's safety deadline has
+            // passed, auto-clear. (Normally poll.rs clears it when
+            // mpv main/backup has a first frame. This is a belt-and-
+            // suspenders — a broken loadfile shouldn't leave the
+            // static image up.)
+            if let Some(deadline) = self.switching_snapshot_until {
+                if std::time::Instant::now() >= deadline {
+                    self.switching_snapshot = None;
+                    self.switching_snapshot_until = None;
+                    self.last_area = None;
+                }
+            }
             // mpv is at the on-screen position when no modal is open,
-            // off-screen when a modal hides it (so GPUI overlays
-            // aren't covered by mpv's X11 child window).
-            if self.video_hidden {
+            // off-screen when a modal hides it OR when a channel-
+            // switch snapshot is being displayed (so the GPUI img
+            // element below isn't covered by mpv's X11 child window).
+            let hide_mpv = self.video_hidden || self.switching_snapshot.is_some();
+            if hide_mpv {
                 self.apply_geometry(-10000, -10000, w, h);
             } else {
                 self.apply_geometry(SIDEBAR_W as i32, TOPBAR_H as i32, w, h);
@@ -126,8 +140,12 @@ impl Render for PlayerView {
             .bg(rgb(0x000000))
             .child({
                 // The video area: black background. When loading, show an
-                // animated spinner centered. When not loading, this stays
-                // empty so mpv (overlaid via X11 child window) is visible.
+                // animated spinner centered. When switching to a favorite,
+                // paint its pre-fetched YouTube thumbnail so the user sees
+                // an immediate visual change while mpv (off-screen) boots
+                // the new stream. When not loading and no snapshot, this
+                // stays empty so mpv (overlaid via X11 child window) is
+                // visible.
                 let mut area = div()
                     .flex_1()
                     .flex()
@@ -136,6 +154,13 @@ impl Render for PlayerView {
                     .bg(rgb(0x000000));
                 if is_loading {
                     area = area.child(loading_indicator());
+                } else if let Some(img) = self.switching_snapshot.clone() {
+                    area = area.child(
+                        gpui::img(img)
+                            .w_full()
+                            .h_full()
+                            .object_fit(gpui::ObjectFit::Contain),
+                    );
                 }
                 area
             })

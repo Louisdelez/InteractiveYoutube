@@ -76,6 +76,15 @@ pub struct AppView {
     /// 200 ms later re-enters load_state idempotently and applies any
     /// drift correction.
     pub(super) last_state_per_channel: std::collections::HashMap<String, crate::models::tv_state::TvState>,
+    /// Pre-fetched YouTube thumbnail per FAVORITE channel (keyed on
+    /// channel_id). Painted at click time before mpv decodes its
+    /// first frame — gives an immediate visual change on zap for
+    /// every favorite, no server involvement. Scoped to favorites
+    /// keeps RAM at ~1 MB (5-10 × 150 KB) instead of ~7 MB for all
+    /// 48 channels. Kept fresh via the dispatch.rs tv:state/tv:sync
+    /// hook (re-fetches on auto-advance) and the favorite-toggle
+    /// subscription (fetches on add, evicts on remove).
+    pub(super) frame_cache: crate::services::frame_cache::FrameCache,
     /// Connection status — derived from `latency_ms`. Kept for the player
     /// overlay logic ("server unavailable" curtain).
     pub(super) connected: bool,
@@ -266,6 +275,7 @@ impl AppView {
                 // the optimistic instant-zap path instead of waiting
                 // for the server round-trip.
                 last_state_per_channel: crate::services::state_cache::load(),
+                frame_cache: crate::services::frame_cache::FrameCache::new(),
                 connected: false,
                 maintenance: false,
                 maintenance_warning: false,

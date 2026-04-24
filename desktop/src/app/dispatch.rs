@@ -91,9 +91,25 @@ pub(super) fn start(
                                             // per channel for the optimistic
                                             // instant-zap at click time.
                                             if let Some(e) = entity_for_status.upgrade() {
-                                                e.update(cx, |this, _cx| {
+                                                e.update(cx, |this, cx| {
                                                     this.last_state_per_channel
                                                         .insert(state.channel_id.clone(), state.clone());
+                                                    // If this channel is a favorite and
+                                                    // its thumbnail cache is missing or
+                                                    // pointing at a stale videoId, kick
+                                                    // off a background fetch so the
+                                                    // next click paints a snapshot
+                                                    // instead of the previous frame.
+                                                    let is_fav = this.settings.favorites.iter().any(|f| f == &state.channel_id);
+                                                    let needs = is_fav && this.frame_cache.needs_refresh(&state.channel_id, &state.video_id);
+                                                    if needs {
+                                                        super::background_tasks::fetch_snapshot(
+                                                            cx.entity().downgrade(),
+                                                            state.channel_id.clone(),
+                                                            state.video_id.clone(),
+                                                            cx,
+                                                        );
+                                                    }
                                                 });
                                             }
                                         }

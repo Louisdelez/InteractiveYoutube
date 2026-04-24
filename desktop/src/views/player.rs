@@ -178,6 +178,21 @@ pub struct PlayerView {
     /// stays black forever if mpv silently fails). The overlay also clears
     /// as soon as `loading_for_video` is recognised in mpv's `path`.
     pub(super) loading_until: Option<std::time::Instant>,
+    /// Pre-fetched JPEG of the channel we're switching TO. Painted by
+    /// render as a GPUI img element in the video area while mpv is
+    /// held off-screen (`switching_snapshot_active` forces apply_
+    /// geometry to -10000 even without `video_hidden`). Cleared by
+    /// the poll loop when EITHER main mpv fires `VIDEO_RECONFIG` OR
+    /// the backup mpv becomes the visible surface via
+    /// `pending_backup_reveal`. Effect: on every click toward a
+    /// favorite, the user sees an immediate visual change to the
+    /// target channel's image instead of the previous channel's
+    /// frozen last frame.
+    pub(super) switching_snapshot: Option<std::sync::Arc<gpui::Image>>,
+    /// Safety deadline — if neither swap signal fires within this
+    /// window, clear the snapshot anyway so a broken loadfile
+    /// doesn't leave the static image up forever.
+    pub(super) switching_snapshot_until: Option<std::time::Instant>,
     /// The earliest moment the spinner is allowed to appear on screen.
     /// We keep showing the previous video's last frame for ~500 ms after
     /// a switch — if backup mpv finishes buffering before this delay,
@@ -493,6 +508,8 @@ impl PlayerView {
                 // Show the black loading screen at startup. We use a far-future
                 // deadline; the first `load_state` call will set a real one.
                 loading_until: None,
+                switching_snapshot: None,
+                switching_snapshot_until: None,
                 loading_show_after: None,
                 switch_arm_at: None,
                 switch_overlay_shown_at: None,
@@ -626,6 +643,36 @@ impl PlayerView {
         }
         // Force a re-apply of geometry on the next render
         self.last_area = None;
+    }
+
+    /// Arm the channel-switch snapshot : paint the given JPEG over
+    /// the video area on the next render, holding mpv off-screen
+    /// until the poll loop detects that backup OR main has a fresh
+    /// first frame. No-op on non-Linux (the off-screen-while-
+    /// snapshot trick relies on the X11 child-window / GPUI
+    /// composition order).
+    pub fn show_snapshot(&mut self, image: std::sync::Arc<gpui::Image>) {
+        self.switching_snapshot = Some(image);
+        // Safety window — must be longer than typical cold-zap time
+        // (300-500 ms main VIDEO_RECONFIG) but short enough that a
+        // broken loadfile doesn't leave a stale image up for
+        // minutes. 3 s matches the backup→main swap-up timer.
+        self.switching_snapshot_until = Some(
+            std::time::Instant::now() + std::time::Duration::from_secs(3),
+        );
+        // Invalidate geometry so the next render repositions mpv
+        // off-screen (the GPUI img element occupies the video area
+        // on top of the now-hidden mpv child window).
+        self.last_area = None;
+    }
+
+    /// Clear the snapshot and let mpv come back on-screen.
+    pub fn clear_snapshot(&mut self) {
+        if self.switching_snapshot.is_some() {
+            self.switching_snapshot = None;
+            self.switching_snapshot_until = None;
+            self.last_area = None;
+        }
     }
 
     pub fn force_play(&self) {
