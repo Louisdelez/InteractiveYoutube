@@ -3,7 +3,7 @@ use gpui::{ObjectFit, StyledImage};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
-use crate::models::channel::{Channel, get_channels};
+use crate::models::channel::Channel;
 use crate::views::icons::{IconCache, IconName};
 
 // Embed avatars that aren't on YouTube CDN. Dev-mode bypass : the Node
@@ -69,10 +69,20 @@ pub struct SidebarView {
 
 impl SidebarView {
     pub fn new() -> Self {
-        let mut channels = get_channels();
-        channels.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
-
-        // Preload embedded avatars
+        // Empty list until the server responds. The `background_tasks
+        // ::channels_and_avatars` poller replaces it via
+        // `set_channels_from_server` as soon as `GET /api/tv/channels`
+        // returns (typically 100-500 ms after boot). If the server is
+        // unreachable, the sidebar stays empty — which is honest :
+        // without a server the whole TV pipeline is down anyway.
+        //
+        // Avatars for local channels (noob, pierre-chabrier,
+        // hits-du-moment) are embedded in the binary so the sidebar
+        // has artwork available the moment `set_channels_from_server`
+        // populates the list — no flash of missing images. Remote
+        // avatars (YouTube CDN URLs for the 49 other channels) are
+        // fetched by the background task after the channel list
+        // arrives.
         let mut avatars = HashMap::new();
         avatars.insert(
             "noob".to_string(),
@@ -87,23 +97,9 @@ impl SidebarView {
             Arc::new(Image::from_bytes(ImageFormat::Png, AVATAR_HITS_DU_MOMENT.to_vec())),
         );
 
-        // Pick a random initial channel so each launch lands on a
-        // different chaîne. The server also randomises per connection
-        // (see server/socket/index.js), so this aligns client + server.
-        let selected = if channels.is_empty() {
-            0
-        } else {
-            // Pseudo-random: nanosecond timestamp mod channels.len().
-            let nanos = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .map(|d| d.subsec_nanos() as usize)
-                .unwrap_or(0);
-            nanos % channels.len()
-        };
-
         Self {
-            channels,
-            selected,
+            channels: Vec::new(),
+            selected: 0,
             avatars,
             search_query: String::new(),
             memory_channel_ids: Vec::new(),
@@ -136,34 +132,23 @@ impl SidebarView {
         self.search_query = q;
     }
 
-    /// Tuple per channel: (id, name, handle, avatar_url). Handle/avatar may
-    /// be empty strings if the server doesn't know them — we fall back to
-    /// the bundled hardcoded list so older servers keep working.
+    /// Tuple per channel : `(id, name, handle, avatar_url)`. The server
+    /// is the single source of truth — empty handle/avatar fields are
+    /// accepted as-is ; no client-side fallback list to lie about
+    /// missing metadata. Channels without an avatar_url render with
+    /// the first letter of their name as placeholder (the sidebar
+    /// render path already handles that).
     pub fn set_channels_from_server(
         &mut self,
         server: Vec<(String, String, String, String)>,
     ) {
-        let hardcoded = get_channels();
-        let lookup = |id: &str| hardcoded.iter().find(|c| c.id == id).cloned();
-
         let mut new_channels: Vec<Channel> = server
             .into_iter()
-            .map(|(id, name, handle, avatar)| {
-                let fallback = lookup(&id);
-                Channel {
-                    id,
-                    name,
-                    handle: if !handle.is_empty() {
-                        handle
-                    } else {
-                        fallback.as_ref().map(|c| c.handle.clone()).unwrap_or_default()
-                    },
-                    avatar_url: if !avatar.is_empty() {
-                        avatar
-                    } else {
-                        fallback.as_ref().map(|c| c.avatar_url.clone()).unwrap_or_default()
-                    },
-                }
+            .map(|(id, name, handle, avatar)| Channel {
+                id,
+                name,
+                handle,
+                avatar_url: avatar,
             })
             .collect();
         new_channels.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));

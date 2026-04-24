@@ -56,7 +56,9 @@ export default function TauriApp() {
   const { user, login, register, logout } = useAuth();
   const [chatOpen, setChatOpen] = useState(true);
   const [showAuth, setShowAuth] = useState(false);
-  const [currentChannel, setCurrentChannel] = useState('amixem');
+  // Server-driven : the initial tv:state emitted on socket.io connect
+  // sets this to whatever random channel the server picked.
+  const [currentChannel, setCurrentChannel] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
 
   const { tvState, isLoading, onVideoEnd, clockOffset } = useTvSync(currentChannel);

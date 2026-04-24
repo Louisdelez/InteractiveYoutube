@@ -99,7 +99,10 @@ export default function App() {
 
   // Fetch the authoritative channel list from the server once, then
   // pick a random starting channel so every session lands somewhere
-  // different. Propagated to the sidebar + badge.
+  // different. Propagated to the sidebar + badge. If the fetch fails
+  // we DON'T pick a hardcoded default — the socket.io handshake
+  // emits an initial `tv:state` for the server's randomly-chosen
+  // `defaultChannel`, which drives `setCurrentChannel` elsewhere.
   useEffect(() => {
     let alive = true;
     api.get('/api/tv/channels')
@@ -112,9 +115,7 @@ export default function App() {
           setCurrentChannel(rnd.id);
         }
       })
-      .catch(() => {
-        if (alive && !currentChannel) setCurrentChannel('amixem');
-      });
+      .catch(() => { /* server-driven defaultChannel will arrive via socket.io */ });
     return () => { alive = false; };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
