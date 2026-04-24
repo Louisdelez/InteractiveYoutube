@@ -6,9 +6,14 @@ use std::time::Duration;
 use crate::models::channel::{Channel, get_channels};
 use crate::views::icons::{IconCache, IconName};
 
-// Embed avatars that aren't on YouTube CDN
+// Embed avatars that aren't on YouTube CDN. Dev-mode bypass : the Node
+// server at :4500 only serves `/avatars/*` in production (via
+// `express.static(client/dist)`), so in dev these would 404 and the
+// sidebar would show a grey placeholder. Embedded bytes sidestep the
+// fetch entirely.
 const AVATAR_NOOB: &[u8] = include_bytes!("../../assets/noob.jpg");
 const AVATAR_PIERRE_CHABRIER: &[u8] = include_bytes!("../../assets/pierre-chabrier.jpg");
+const AVATAR_HITS_DU_MOMENT: &[u8] = include_bytes!("../../assets/hits-du-moment.png");
 
 /// Event emitted when user clicks a channel in the sidebar.
 #[derive(Clone, Debug)]
@@ -76,6 +81,10 @@ impl SidebarView {
         avatars.insert(
             "pierre-chabrier".to_string(),
             Arc::new(Image::from_bytes(ImageFormat::Jpeg, AVATAR_PIERRE_CHABRIER.to_vec())),
+        );
+        avatars.insert(
+            "hits-du-moment".to_string(),
+            Arc::new(Image::from_bytes(ImageFormat::Png, AVATAR_HITS_DU_MOMENT.to_vec())),
         );
 
         // Pick a random initial channel so each launch lands on a
