@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
+    <meta name="theme-color" content="#0e0e10" />
+    <title>Koala TV — Télécommande</title>
+    <link rel="stylesheet" href="remote.css" />
+  </head>
+  <body>
+    <div id="app" class="app">
+      <header class="header">
+        <div class="now-playing">
+          <span class="label">En cours</span>
+          <span id="current-channel" class="channel-name">—</span>
+        </div>
+        <div class="volume">
+          <button class="icon-btn" id="btn-mute" aria-label="Muet">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
+              <path id="vol-icon-path" d="M3 9v6h4l5 5V4L7 9H3zm13.5 3A4.5 4.5 0 0 0 14 7.97v8.05a4.5 4.5 0 0 0 2.5-4.02z"/>
+            </svg>
+          </button>
+          <input type="range" id="volume" min="0" max="100" value="100" step="1" />
+          <span id="volume-value" class="volume-value">100</span>
+        </div>
+      </header>
+
+      <main class="grid-wrap">
+        <div id="grid" class="grid" aria-label="Favoris"></div>
+        <div id="dots" class="dots"></div>
+      </main>
+
+      <footer class="controls">
+        <button class="ctrl" id="btn-vol-down" aria-label="Volume −">
+          <svg viewBox="0 0 24 24" width="28" height="28" fill="currentColor"><path d="M5 11h14v2H5z"/></svg>
+        </button>
+        <button class="ctrl" id="btn-prev" aria-label="Retour">
+          <svg viewBox="0 0 24 24" width="28" height="28" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6 8.5 6V6z"/></svg>
+        </button>
+        <button class="ctrl" id="btn-next" aria-label="Suivant">
+          <svg viewBox="0 0 24 24" width="28" height="28" fill="currentColor"><path d="M6 6v12l8.5-6L6 6zm10 0h2v12h-2z"/></svg>
+        </button>
+        <button class="ctrl" id="btn-vol-up" aria-label="Volume +">
+          <svg viewBox="0 0 24 24" width="28" height="28" fill="currentColor"><path d="M11 5v6H5v2h6v6h2v-6h6v-2h-6V5z"/></svg>
+        </button>
+      </footer>
+
+      <div id="status-bar" class="status offline">Hors ligne</div>
+    </div>
+    <script src="remote.js"></script>
+  </body>
+</html>

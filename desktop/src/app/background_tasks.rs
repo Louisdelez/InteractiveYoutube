@@ -9,6 +9,7 @@
 
 use super::*;
 use crate::services::frame_cache;
+use crate::services::remote_server::{ChannelLite, RemoteCommand, RemoteState};
 
 /// Fetch a single YouTube thumbnail for a favorite channel's current
 /// videoId. Inserts into `AppView::frame_cache` on success. Silent
@@ -422,4 +423,231 @@ pub(super) fn me_probe(
                 }
             })
             .detach();
+}
+
+/// Poll the RemoteServer's command mpsc from the GPUI executor and
+/// dispatch each `RemoteCommand` to the matching AppView action.
+/// Also pushes a fresh state snapshot to the web remote whenever a
+/// command completes (so the phone UI reflects desktop-side changes
+/// even if they originated elsewhere).
+pub(super) fn remote_poll(
+    entity: WeakEntity<AppView>,
+    cx: &mut Context<AppView>,
+) {
+    cx.spawn(async move |_, cx| {
+        loop {
+            let Some(e) = entity.upgrade() else { return };
+            let mut handled = false;
+            let _ = cx.update(|cx| {
+                e.update(cx, |app: &mut AppView, cx| {
+                    let mut cmds = Vec::new();
+                    if let Some(server) = app.remote_server.as_ref() {
+                        while let Ok(c) = server.cmd_rx.try_recv() {
+                            cmds.push(c);
+                        }
+                    }
+                    if cmds.is_empty() {
+                        return;
+                    }
+                    handled = true;
+                    for cmd in cmds {
+                        handle_remote_command(app, cmd, cx);
+                    }
+                    broadcast_remote_state(app, cx);
+                });
+            });
+            let tick = if handled {
+                Duration::from_millis(20)
+            } else {
+                Duration::from_millis(150)
+            };
+            cx.background_executor().timer(tick).await;
+        }
+    })
+    .detach();
+}
+
+fn handle_remote_command(
+    app: &mut AppView,
+    cmd: RemoteCommand,
+    cx: &mut Context<AppView>,
+) {
+    match cmd {
+        RemoteCommand::VolumeUp => {
+            let cur = app.player.read(cx).volume_raw();
+            let next = ((cur + 5).min(100).max(0)) as u8;
+            #[cfg(target_os = "linux")]
+            app.player.update(cx, |p, cx| p.set_volume_from_remote(next, cx));
+            let _ = next;
+        }
+        RemoteCommand::VolumeDown => {
+            let cur = app.player.read(cx).volume_raw();
+            let next = ((cur - 5).max(0)) as u8;
+            #[cfg(target_os = "linux")]
+            app.player.update(cx, |p, cx| p.set_volume_from_remote(next, cx));
+            let _ = next;
+        }
+        RemoteCommand::SetVolume { value } => {
+            #[cfg(target_os = "linux")]
+            app.player.update(cx, |p, cx| p.set_volume_from_remote(value, cx));
+            let _ = value;
+        }
+        RemoteCommand::ToggleMute => {
+            #[cfg(target_os = "linux")]
+            app.player.update(cx, |p, _| p.toggle_mute_from_remote());
+        }
+        RemoteCommand::SelectChannel { id } => {
+            trigger_channel_select(app, id, cx);
+        }
+        RemoteCommand::NextChannel => {
+            let chans: Vec<String> = app
+                .sidebar
+                .read(cx)
+                .channels
+                .iter()
+                .map(|c| c.id.clone())
+                .collect();
+            if chans.is_empty() {
+                return;
+            }
+            let cur = app.current_channel_id.clone();
+            let idx = cur
+                .as_deref()
+                .and_then(|c| chans.iter().position(|x| x == c));
+            let next_idx = match idx {
+                Some(i) => (i + 1) % chans.len(),
+                None => 0,
+            };
+            let next_id = chans[next_idx].clone();
+            trigger_channel_select(app, next_id, cx);
+        }
+        RemoteCommand::PrevMemory => {
+            #[cfg(target_os = "linux")]
+            {
+                let ids = app.player.read(cx).memory_channel_ids_public();
+                if let Some(target) = ids.first().cloned() {
+                    trigger_channel_select(app, target, cx);
+                }
+            }
+        }
+    }
+}
+
+fn trigger_channel_select(
+    app: &mut AppView,
+    channel_id: String,
+    cx: &mut Context<AppView>,
+) {
+    if !app.connected {
+        return;
+    }
+    let name = app
+        .sidebar
+        .read(cx)
+        .channels
+        .iter()
+        .find(|c| c.id == channel_id)
+        .map(|c| c.name.clone())
+        .unwrap_or_else(|| channel_id.clone());
+
+    app.current_channel_id = Some(channel_id.clone());
+    app.pending_channel_switch = Some(channel_id.clone());
+    #[cfg(target_os = "linux")]
+    {
+        let is_fav = app.settings.favorites.contains(&channel_id);
+        if let Some(bytes) = app.avatar_bytes.get(&channel_id).cloned() {
+            app.player.update(cx, |p, _| {
+                p.set_channel_badge(name.clone(), bytes, is_fav);
+            });
+        }
+    }
+    let _ = name;
+    app.chat.update(cx, |c, cx| {
+        c.clear_messages(cx);
+        cx.notify();
+    });
+    #[cfg(target_os = "linux")]
+    if let Some(entry) = app.frame_cache.get(&channel_id) {
+        let image = entry.image.clone();
+        app.player.update(cx, |p, _| p.show_snapshot(image));
+    }
+    if let Some(cached) = app.last_state_per_channel.get(&channel_id).cloned() {
+        let now_secs = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(cached.server_time);
+        let elapsed = now_secs.saturating_sub(cached.server_time) as f64;
+        let rebased_seek = cached.seek_to + elapsed;
+        let rebased = if rebased_seek < cached.duration {
+            crate::models::tv_state::TvState {
+                seek_to: rebased_seek,
+                ..cached
+            }
+        } else {
+            cached
+        };
+        app.player.update(cx, |p, cx| p.load_state(&rebased, cx));
+    }
+    let _ = app.cmd_tx.send(ClientCommand::SwitchChannel(channel_id.clone()));
+    let _ = app
+        .cmd_tx
+        .send(ClientCommand::ChatChannelChanged(channel_id));
+}
+
+pub(super) fn broadcast_remote_state(app: &AppView, cx: &mut Context<AppView>) {
+    let Some(server) = app.remote_server.as_ref() else { return };
+    let channels: Vec<(String, String)> = app
+        .sidebar
+        .read(cx)
+        .channels
+        .iter()
+        .map(|c| (c.id.clone(), c.name.clone()))
+        .collect();
+    let current = app
+        .current_channel_id
+        .as_deref()
+        .and_then(|id| channels.iter().find(|(cid, _)| cid == id))
+        .map(|(id, name)| ChannelLite {
+            id: id.clone(),
+            name: name.clone(),
+        });
+    let favorites: Vec<ChannelLite> = app
+        .settings
+        .favorites
+        .iter()
+        .filter_map(|fid| {
+            channels
+                .iter()
+                .find(|(id, _)| id == fid)
+                .map(|(id, name)| ChannelLite {
+                    id: id.clone(),
+                    name: name.clone(),
+                })
+        })
+        .collect();
+    #[cfg(target_os = "linux")]
+    let memory = app.player.read(cx).memory_channel_ids_public();
+    #[cfg(not(target_os = "linux"))]
+    let memory: Vec<String> = Vec::new();
+    #[cfg(target_os = "linux")]
+    let (volume, muted) = {
+        let p = app.player.read(cx);
+        (p.volume_value(), p.is_muted())
+    };
+    #[cfg(not(target_os = "linux"))]
+    let (volume, muted) = (100u8, false);
+
+    if let Ok(mut store) = server.avatar_store.lock() {
+        store.clear();
+        for (id, bytes) in app.avatar_bytes.iter() {
+            store.insert(id.clone(), bytes.clone());
+        }
+    }
+    server.push_state(RemoteState {
+        volume,
+        muted,
+        current_channel: current,
+        favorites,
+        memory,
+    });
 }

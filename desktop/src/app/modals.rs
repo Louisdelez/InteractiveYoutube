@@ -20,7 +20,8 @@ impl AppView {
             return;
         }
         let initial = self.settings.clone();
-        let modal = cx.new(|_| SettingsModal::new(initial));
+        let remote_url = self.remote_server.as_ref().map(|s| s.url.clone());
+        let modal = cx.new(|_| SettingsModal::new(initial, remote_url));
         let player_clone = self.player.clone();
         let _sub = cx.subscribe(
             &modal,

@@ -118,6 +118,11 @@ pub struct AppView {
     pub(super) tooltip: Rc<RefCell<Option<TooltipOverlay>>>,
     #[allow(dead_code)]
     pub(super) cmd_tx: std::sync::mpsc::Sender<ClientCommand>,
+    /// Embedded HTTP + WebSocket server for the smartphone web
+    /// remote. `Some` when the server successfully bound a port at
+    /// boot ; `None` if binding failed (worker thread couldn't
+    /// start, firewall, ...). Dropped = stopped.
+    pub(super) remote_server: Option<crate::services::remote_server::RemoteServer>,
     #[allow(dead_code)]
     pub(super) _subscriptions: Vec<Subscription>,
 }
@@ -292,6 +297,22 @@ impl AppView {
                 cmd_tx,
                 search_state,
                 icons: Rc::new(RefCell::new(IconCache::new())),
+                remote_server: {
+                    // Spawn the LAN remote server + wire its command
+                    // receiver into a poll loop so phone commands
+                    // drive the same actions as the desktop UI.
+                    let rs = crate::services::remote_server::RemoteServer::start();
+                    if let Some(ref server) = rs {
+                        tracing::info!(url = %server.url, "remote: ready");
+                        background_tasks::remote_poll(
+                            cx.entity().downgrade(),
+                            cx,
+                        );
+                    } else {
+                        tracing::warn!("remote: server failed to start");
+                    }
+                    rs
+                },
                 _subscriptions: vec![
                     sub_channel,
                     sub_chat,

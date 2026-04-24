@@ -11,6 +11,7 @@
 use crate::i18n::t;
 use crate::services::settings::Settings;
 use gpui::*;
+use std::sync::Arc;
 
 #[derive(Clone, Debug)]
 pub enum SettingsEvent {
@@ -32,16 +33,50 @@ impl EventEmitter<SettingsEvent> for SettingsModal {}
 
 pub struct SettingsModal {
     pub settings: Settings,
+    /// LAN URL of the smartphone remote, if the embedded HTTP
+    /// server bound successfully at app boot. `None` → the
+    /// "Télécommande" section shows a "server unavailable" note.
+    pub remote_url: Option<String>,
+    /// Pre-rasterised QR code for the current `remote_url`. Cached
+    /// on first build so we don't re-encode every render tick.
+    pub remote_qr: Option<Arc<Image>>,
 }
 
 impl SettingsModal {
-    pub fn new(settings: Settings) -> Self {
-        Self { settings }
+    pub fn new(settings: Settings, remote_url: Option<String>) -> Self {
+        let remote_qr = remote_url.as_deref().and_then(render_qr_png);
+        Self { settings, remote_url, remote_qr }
     }
 
     pub fn set_settings(&mut self, settings: Settings) {
         self.settings = settings;
     }
+}
+
+/// Generate an SVG QR code for `url` and rasterise it to a
+/// `gpui::Image`. Size 240×240 px, dark-on-light so it scans under
+/// any room light. Returns None if any step fails (qr gen /
+/// svg parse / render / png encode) — caller shows a fallback.
+fn render_qr_png(url: &str) -> Option<Arc<Image>> {
+    let svg = crate::services::remote_server::qr_code_svg(url)?;
+    let opt = usvg::Options::default();
+    let tree = usvg::Tree::from_data(svg.as_bytes(), &opt).ok()?;
+    let size = 240u32;
+    let mut pixmap = tiny_skia::Pixmap::new(size, size)?;
+    let scale = size as f32 / tree.size().width();
+    resvg::render(
+        &tree,
+        tiny_skia::Transform::from_scale(scale, scale),
+        &mut pixmap.as_mut(),
+    );
+    let mut png_out = Vec::new();
+    let mut encoder = png::Encoder::new(&mut png_out, size, size);
+    encoder.set_color(png::ColorType::Rgba);
+    encoder.set_depth(png::BitDepth::Eight);
+    let mut writer = encoder.write_header().ok()?;
+    writer.write_image_data(pixmap.data()).ok()?;
+    drop(writer);
+    Some(Arc::new(Image::from_bytes(ImageFormat::Png, png_out)))
 }
 
 impl Render for SettingsModal {
@@ -246,7 +281,66 @@ impl Render for SettingsModal {
                             .text_xs()
                             .text_color(rgb(0x6b7280))
                             .child(hint)
-                    }),
+                    })
+                    // ── Remote control section ──────────────────────
+                    .child(
+                        div()
+                            .mt(px(16.0))
+                            .pt(px(16.0))
+                            .border_t_1()
+                            .border_color(rgb(0x2d2d35))
+                            .flex()
+                            .flex_col()
+                            .gap(px(8.0))
+                            .child(
+                                div()
+                                    .text_sm()
+                                    .font_weight(FontWeight::SEMIBOLD)
+                                    .text_color(rgb(0xefeff1))
+                                    .child(t("settings.remote.title")),
+                            )
+                            .child(
+                                div()
+                                    .text_xs()
+                                    .text_color(rgb(0x9b9b9e))
+                                    .child(t("settings.remote.description")),
+                            )
+                            .child({
+                                let body: AnyElement = if let Some(qr) = self.remote_qr.clone() {
+                                    div()
+                                        .mt(px(8.0))
+                                        .flex()
+                                        .flex_col()
+                                        .items_center()
+                                        .gap(px(6.0))
+                                        .child(
+                                            img(qr)
+                                                .w(px(220.0))
+                                                .h(px(220.0))
+                                                .rounded(px(8.0)),
+                                        )
+                                        .child({
+                                            let url_display = self
+                                                .remote_url
+                                                .clone()
+                                                .unwrap_or_default();
+                                            div()
+                                                .text_xs()
+                                                .text_color(rgb(0x9b9b9e))
+                                                .child(url_display)
+                                        })
+                                        .into_any_element()
+                                } else {
+                                    div()
+                                        .mt(px(8.0))
+                                        .text_xs()
+                                        .text_color(rgb(0xeab308))
+                                        .child(t("settings.remote.unavailable"))
+                                        .into_any_element()
+                                };
+                                body
+                            }),
+                    ),
             )
     }
 }

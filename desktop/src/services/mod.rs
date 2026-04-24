@@ -7,6 +7,7 @@ pub mod mpv_checked;
 pub mod mpv_ipc;
 pub mod mpv_profiles;
 pub mod pseudo;
+pub mod remote_server;
 pub mod settings;
 pub mod state_cache;
 pub mod ytdlp_updater;

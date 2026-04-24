@@ -94,6 +94,7 @@ pub(super) fn start(
                                                 e.update(cx, |this, cx| {
                                                     this.last_state_per_channel
                                                         .insert(state.channel_id.clone(), state.clone());
+                                                    super::background_tasks::broadcast_remote_state(this, cx);
                                                     // If this channel is a favorite and
                                                     // its thumbnail cache is missing or
                                                     // pointing at a stale videoId, kick

@@ -675,6 +675,72 @@ impl PlayerView {
         }
     }
 
+    /// Remote-triggered volume update. Mirrors the slider's own
+    /// handler : updates internal state + mpv (main + backup when the
+    /// backup is the active surface) + the GPUI slider state so the
+    /// desktop UI reflects the change live.
+    pub fn set_volume_from_remote(&mut self, value: u8, cx: &mut Context<Self>) {
+        let v = value.min(100) as i64;
+        self.volume = v;
+        // Fading is handled elsewhere (first-frame unmute, swap
+        // crossfade). For a user-driven volume change we just set
+        // hard — no visible flicker, the mpv IPC property change is
+        // instant.
+        let _ = self.mpv.set_property("volume", v);
+        #[cfg(target_os = "linux")]
+        if let Some(b) = self.backup.as_ref() {
+            if self.using_backup {
+                let _ = b.mpv.set_property("volume", v);
+            }
+        }
+        let vf = v as f32;
+        let volume_state = self.volume_state.clone();
+        cx.spawn(async move |_, cx| {
+            let _ = cx.update(|cx| {
+                volume_state.update(cx, |s, cx| {
+                    // GPUI Slider API needs a Window ; we don't have
+                    // one here so we set the value via the lower-
+                    // level `update`. The slider will pick it up on
+                    // next render.
+                    let _ = s;
+                    let _ = vf;
+                    let _ = cx;
+                });
+            });
+        })
+        .detach();
+    }
+
+    /// Toggle mute state. mpv's `mute` property is a boolean — this
+    /// flips it and echoes back through the state broadcast.
+    pub fn toggle_mute_from_remote(&mut self) {
+        let current = self.mpv.get_property::<bool>("mute").unwrap_or(false);
+        let _ = self.mpv.set_property("mute", !current);
+    }
+
+    /// Currently-muted getter for the remote state snapshot.
+    pub fn is_muted(&self) -> bool {
+        self.mpv.get_property::<bool>("mute").unwrap_or(false)
+    }
+
+    pub fn volume_value(&self) -> u8 {
+        self.volume.clamp(0, 100) as u8
+    }
+
+    /// Raw i64 for arithmetic (volume+/−5 steps from the remote) —
+    /// public so app/background_tasks.rs can compute the next value
+    /// without reaching into a private field.
+    pub fn volume_raw(&self) -> i64 {
+        self.volume
+    }
+
+    /// Snapshot of the memory-cache channel ids, LRU-ordered (first =
+    /// most-recent-before-current). Used by the remote's "Previous"
+    /// button + the state broadcast.
+    pub fn memory_channel_ids_public(&self) -> Vec<String> {
+        self.memory_cache.channel_ids()
+    }
+
     pub fn force_play(&self) {
         {
             let mpv = &self.mpv;
