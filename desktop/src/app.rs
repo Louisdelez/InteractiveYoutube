@@ -1,3 +1,7 @@
+// Sub-modules live in `src/app/`.
+mod fps;
+use fps::FpsCounter;
+
 use gpui::*;
 use gpui_component::input::{Input, InputEvent, InputState};
 use std::sync::mpsc;
@@ -28,7 +32,7 @@ pub struct AppView {
     /// counter keeps updating during idle — up from the old 200 ms
     /// tick so the bare overhead of "forced re-render for telemetry"
     /// is 5× cheaper.
-    frame_times: std::rc::Rc<std::cell::RefCell<std::collections::VecDeque<std::time::Instant>>>,
+    frame_times: FpsCounter,
     /// (channel_id, channel_name) of the currently hovered sidebar
     /// button. Used by the debounced hover-preload so we can check
     /// "still hovering the same channel 300 ms later?" before kicking
@@ -1012,9 +1016,7 @@ impl AppView {
                 sidebar,
                 player,
                 chat,
-                frame_times: std::rc::Rc::new(std::cell::RefCell::new(
-                    std::collections::VecDeque::with_capacity(128),
-                )),
+                frame_times: FpsCounter::new(),
                 hovered_channel: None,
                 hover_preload_version: std::cell::Cell::new(0),
                 current_channel_id: initial_channel_id,
@@ -1311,29 +1313,9 @@ impl AppView {
 
 impl Render for AppView {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        // Record this frame and prune entries older than 1 s.
-        let now = std::time::Instant::now();
-        let cutoff = now - std::time::Duration::from_secs(1);
-        {
-            let mut ft = self.frame_times.borrow_mut();
-            ft.push_back(now);
-            while ft.front().map_or(false, |t| *t < cutoff) {
-                ft.pop_front();
-            }
-        }
-        let fps = self.frame_times.borrow().len();
-        // Keep the counter ticking at ~1 Hz even when nothing else
-        // re-renders. 1 s tick instead of the old 200 ms = 5× less
-        // forced work for telemetry.
-        cx.spawn(async move |this, cx| {
-            cx.background_executor()
-                .timer(std::time::Duration::from_secs(1))
-                .await;
-            if let Some(e) = this.upgrade() {
-                let _ = cx.update_entity(&e, |_, cx| cx.notify());
-            }
-        })
-        .detach();
+        self.frame_times.record();
+        let fps = self.frame_times.current();
+        FpsCounter::schedule_next_tick(cx);
         div()
             .flex()
             .flex_col()
