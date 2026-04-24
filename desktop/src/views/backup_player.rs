@@ -18,6 +18,7 @@
 
 #![cfg(target_os = "linux")]
 
+use crate::mpv_try;
 use crate::services::mpv_ipc::{MpvEvent, MpvIpcClient};
 use std::ffi::c_ulong;
 use std::sync::Arc;
@@ -139,9 +140,17 @@ impl BackupPlayer {
         // `poll_first_frame_ready` return false forever.
         while self.mpv.wait_event(0.0).is_some() {}
         if seek_to > 0.5 {
-            let _ = self.mpv.set_property("start", format!("+{}", seek_to));
+            mpv_try!(
+                self.mpv.set_property("start", format!("+{}", seek_to)),
+                "backup set start",
+                seek_to
+            );
         }
-        let _ = self.mpv.command("loadfile", &[youtube_url]);
+        mpv_try!(
+            self.mpv.command("loadfile", &[youtube_url]),
+            "backup loadfile",
+            youtube_url
+        );
     }
 
     /// Drain mpv's event queue and return `true` once `VideoReconfig`
