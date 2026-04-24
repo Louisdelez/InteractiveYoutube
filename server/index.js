@@ -66,7 +66,7 @@ app.get('/metrics', async (req, res) => {
 
 // Serve sticker assets (used by web chat to render [sticker:name] messages)
 app.use('/stickers', express.static(path.join(__dirname, '..', 'desktop', 'assets', 'stickers'), {
-  maxAge: '7d',
+  maxAge: process.env.STICKER_CACHE_MAX_AGE || '7d',
   immutable: true,
 }));
 
@@ -86,7 +86,10 @@ app.use('/api/admin', adminRoutes);
 // Serve client in production
 if (config.NODE_ENV === 'production') {
   const clientDist = path.join(__dirname, '..', 'client', 'dist');
-  app.use(express.static(clientDist, { maxAge: '1y', immutable: true }));
+  app.use(express.static(clientDist, {
+    maxAge: process.env.CLIENT_ASSETS_CACHE_MAX_AGE || '1y',
+    immutable: true,
+  }));
   app.get('*', (req, res) => {
     res.sendFile(path.join(clientDist, 'index.html'));
   });

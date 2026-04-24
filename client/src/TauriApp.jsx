@@ -9,6 +9,18 @@ import { MessageSquare, MessageSquareOff, LogIn, LogOut, User, Search } from 'lu
 const REPO_URL =
   import.meta.env.VITE_REPO_URL || 'https://github.com/Louisdelez/KoalaTV';
 
+// Timing constants — tune via vite env to match YouTube's iframe lag
+// profile on the target machine. `YT_SEEK_DELAY_MS` is the time we
+// wait after `youtube_navigate` before issuing the initial seek (the
+// iframe needs the video metadata to be parsed, else the seek is
+// dropped). `YT_POS_SYNC_MS` is the interval of the position-sync
+// loop that keeps the transparent HTML overlay aligned when the user
+// drags / resizes the window.
+const YT_SEEK_DELAY_MS =
+  parseInt(import.meta.env.VITE_YT_SEEK_DELAY_MS) || 3000;
+const YT_POS_SYNC_MS =
+  parseInt(import.meta.env.VITE_YT_POS_SYNC_MS) || 300;
+
 function GithubIcon({ size = 15 }) {
   return (
     <svg
@@ -98,7 +110,7 @@ export default function TauriApp() {
             const timeSinceEmit = (localNow - (tvState.serverTime - clockOffset)) / 1000;
             await invoke('youtube_seek', { seconds: tvState.seekTo + timeSinceEmit });
           } catch {}
-        }, 3000);
+        }, YT_SEEK_DELAY_MS);
       } catch (err) {
         log.error('tauri-app: youtube error', { err: err && err.message ? err.message : String(err) });
       }
@@ -115,7 +127,7 @@ export default function TauriApp() {
     observer.observe(playerZoneRef.current);
 
     // Sync position periodically (handles window move)
-    const interval = setInterval(syncYouTubePosition, 300);
+    const interval = setInterval(syncYouTubePosition, YT_POS_SYNC_MS);
 
     // Show/hide YouTube window on app focus/blur
     const handleFocus = () => { if (ytCreatedRef.current) invoke('youtube_show').catch(() => {}); };

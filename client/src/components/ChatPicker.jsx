@@ -3,6 +3,12 @@ import EmojiPicker from 'emoji-picker-react';
 import { t } from '../i18n';
 import './ChatPicker.css';
 
+// Wait this long after the last keystroke before firing a GIF search.
+// Balances "feels instant" vs "don't hammer Tenor API". Override via
+// `VITE_GIF_SEARCH_DEBOUNCE_MS` for flaky networks.
+const GIF_SEARCH_DEBOUNCE_MS =
+  parseInt(import.meta.env.VITE_GIF_SEARCH_DEBOUNCE_MS) || 300;
+
 const TABS = [
   { id: 'emoji', label: 'Emoji' },
   { id: 'gif', label: 'GIF' },
@@ -75,7 +81,7 @@ function GifTab({ onSelect, onClose }) {
     const q = e.target.value;
     setQuery(q);
     clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => fetchGifs(q), 300);
+    debounceRef.current = setTimeout(() => fetchGifs(q), GIF_SEARCH_DEBOUNCE_MS);
   };
 
   return (

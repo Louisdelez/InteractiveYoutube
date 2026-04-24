@@ -11,9 +11,33 @@ use std::process::Command;
 use std::sync::OnceLock;
 use std::time::Duration;
 
-const DOWNLOAD_URL: &str =
+const DEFAULT_DOWNLOAD_URL: &str =
     "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp";
-const UPDATE_INTERVAL: Duration = Duration::from_secs(6 * 60 * 60);
+const DEFAULT_UPDATE_INTERVAL_SECS: u64 = 6 * 60 * 60;
+const DEFAULT_SPAWN_TIMEOUT_SECS: u64 = 120;
+
+fn download_url() -> String {
+    std::env::var("YTDLP_DOWNLOAD_URL")
+        .ok()
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| DEFAULT_DOWNLOAD_URL.to_string())
+}
+
+fn update_interval() -> Duration {
+    let secs = std::env::var("YTDLP_UPDATE_INTERVAL_SECS")
+        .ok()
+        .and_then(|s| s.parse::<u64>().ok())
+        .unwrap_or(DEFAULT_UPDATE_INTERVAL_SECS);
+    Duration::from_secs(secs)
+}
+
+fn spawn_timeout() -> Duration {
+    let secs = std::env::var("YTDLP_SPAWN_TIMEOUT_SECS")
+        .ok()
+        .and_then(|s| s.parse::<u64>().ok())
+        .unwrap_or(DEFAULT_SPAWN_TIMEOUT_SECS);
+    Duration::from_secs(secs)
+}
 
 static YTDLP_PATH: OnceLock<PathBuf> = OnceLock::new();
 
@@ -49,9 +73,9 @@ fn set_executable(path: &std::path::Path) -> std::io::Result<()> {
 fn download_to(path: &std::path::Path) -> anyhow::Result<()> {
     let client = reqwest::blocking::Client::builder()
         .redirect(reqwest::redirect::Policy::limited(10))
-        .timeout(Duration::from_secs(120))
+        .timeout(spawn_timeout())
         .build()?;
-    let bytes = client.get(DOWNLOAD_URL).send()?.error_for_status()?.bytes()?;
+    let bytes = client.get(&download_url()).send()?.error_for_status()?.bytes()?;
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)?;
     }
@@ -77,29 +101,30 @@ fn self_update(bin: &std::path::Path) {
         Ok(o) if o.status.success() => {
             let after = version_of(bin);
             if before != after {
-                eprintln!(
-                    "yt-dlp: updated {:?} -> {:?}",
-                    before.as_deref(), after.as_deref()
+                tracing::info!(
+                    before = ?before.as_deref(),
+                    after = ?after.as_deref(),
+                    "yt-dlp updated"
                 );
             } else {
-                eprintln!("yt-dlp: up-to-date ({:?})", after.as_deref());
+                tracing::info!(version = ?after.as_deref(), "yt-dlp up-to-date");
             }
         }
-        Ok(o) => eprintln!(
-            "yt-dlp: self-update failed ({}): {}",
-            o.status,
-            String::from_utf8_lossy(&o.stderr).trim()
+        Ok(o) => tracing::warn!(
+            status = %o.status,
+            stderr = %String::from_utf8_lossy(&o.stderr).trim(),
+            "yt-dlp self-update failed"
         ),
-        Err(err) => eprintln!("yt-dlp: self-update spawn error: {}", err),
+        Err(err) => tracing::warn!(err = %err, "yt-dlp self-update spawn error"),
     }
 }
 
 fn tick() {
     let path = binary_path();
     if !path.exists() {
-        eprintln!("yt-dlp: bootstrapping binary at {}", path.display());
+        tracing::info!(path = %path.display(), "yt-dlp bootstrapping binary");
         if let Err(err) = download_to(&path) {
-            eprintln!("yt-dlp: bootstrap failed: {}", err);
+            tracing::error!(err = %err, "yt-dlp bootstrap failed");
             return;
         }
     }
@@ -113,7 +138,7 @@ pub fn spawn() {
         .name("ytdlp-updater".into())
         .spawn(|| loop {
             tick();
-            std::thread::sleep(UPDATE_INTERVAL);
+            std::thread::sleep(update_interval());
         })
         .expect("spawn ytdlp-updater thread");
 }

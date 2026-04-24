@@ -33,7 +33,7 @@ const config = {
   // Override via env when a release is published.
   DESKTOP_DOWNLOAD_URL:
     process.env.DESKTOP_DOWNLOAD_URL ||
-    'https://github.com/Louisdelez/InteractiveYoutube/releases/latest',
+    'https://github.com/Louisdelez/KoalaTV/releases/latest',
 
   // Multi-channel configuration. Loaded from `server/config/channels.json`
   // — schema, per channel:

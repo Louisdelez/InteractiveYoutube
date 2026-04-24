@@ -87,6 +87,46 @@ pub fn start(events: Sender<ServerEvent>) -> Sender<ClientCommand> {
     cmd_tx
 }
 
+/// Post-connect namespace-handshake settle time. Socket.IO accepts
+/// emits immediately after `connect()` returns Ok but silently drops
+/// them before the namespace is registered — this sleep covers the
+/// gap. Override via `KOALA_WS_HANDSHAKE_DELAY_MS`.
+fn handshake_delay() -> Duration {
+    let ms = std::env::var("KOALA_WS_HANDSHAKE_DELAY_MS")
+        .ok()
+        .and_then(|s| s.parse::<u64>().ok())
+        .unwrap_or(150);
+    Duration::from_millis(ms)
+}
+
+/// Interval between `cmd_rx.recv_timeout` ticks. Short enough to react
+/// to `alive=false` promptly on server disconnect.
+fn cmd_tick() -> Duration {
+    let secs = std::env::var("KOALA_WS_CMD_TICK_SECS")
+        .ok()
+        .and_then(|s| s.parse::<u64>().ok())
+        .unwrap_or(1);
+    Duration::from_secs(secs)
+}
+
+/// Cooldown between a clean disconnect and the next reconnect attempt.
+fn reconnect_cooldown() -> Duration {
+    let secs = std::env::var("KOALA_WS_RECONNECT_COOLDOWN_SECS")
+        .ok()
+        .and_then(|s| s.parse::<u64>().ok())
+        .unwrap_or(1);
+    Duration::from_secs(secs)
+}
+
+/// Backoff when the initial `connect()` itself errors (server down).
+fn connect_backoff() -> Duration {
+    let secs = std::env::var("KOALA_WS_CONNECT_BACKOFF_SECS")
+        .ok()
+        .and_then(|s| s.parse::<u64>().ok())
+        .unwrap_or(3);
+    Duration::from_secs(secs)
+}
+
 fn run_socket_loop(events: Sender<ServerEvent>, cmd_rx: Receiver<ClientCommand>) {
     loop {
         // Per-connection "alive" flag flipped to false by the
@@ -241,7 +281,7 @@ fn run_socket_loop(events: Sender<ServerEvent>, cmd_rx: Receiver<ClientCommand>)
                 // Wait briefly for socket.io's namespace handshake to
                 // complete — emitting too early after connect() success
                 // returns Ok but the packet is dropped silently.
-                thread::sleep(Duration::from_millis(150));
+                thread::sleep(handshake_delay());
                 let pseudo = crate::services::pseudo::get_or_create_pseudo();
                 let color = crate::services::pseudo::get_or_create_color();
                 let _ = socket.emit(
@@ -249,7 +289,7 @@ fn run_socket_loop(events: Sender<ServerEvent>, cmd_rx: Receiver<ClientCommand>)
                     serde_json::json!({ "name": pseudo, "color": color }),
                 );
                 while alive.load(Ordering::Relaxed) {
-                    match cmd_rx.recv_timeout(Duration::from_secs(1)) {
+                    match cmd_rx.recv_timeout(cmd_tick()) {
                         Ok(ClientCommand::SwitchChannel(ch)) => {
                             let _ = socket.emit("tv:switchChannel", serde_json::Value::String(ch));
                         }
@@ -274,9 +314,9 @@ fn run_socket_loop(events: Sender<ServerEvent>, cmd_rx: Receiver<ClientCommand>)
                 }
                 // Disconnected — outer loop rebuilds and reconnects.
                 let _ = socket.disconnect();
-                thread::sleep(Duration::from_secs(1));
+                thread::sleep(reconnect_cooldown());
             }
-            Err(_) => thread::sleep(Duration::from_secs(3)),
+            Err(_) => thread::sleep(connect_backoff()),
         }
     }
 }

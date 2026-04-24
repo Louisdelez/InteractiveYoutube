@@ -46,19 +46,23 @@ function parseDuration(iso) {
 // Check if a video is a YouTube Short via HEAD request.
 // Returns true if it's a Short (HTTP 200), false otherwise.
 // Cached on disk + jittered + identified UA to reduce IP rate-limits.
-const UA = 'Mozilla/5.0 (X11; Linux x86_64) IY-PlaylistBuilder/1.0';
+const UA =
+  process.env.YT_SHORTS_USER_AGENT ||
+  'Mozilla/5.0 (X11; Linux x86_64) IY-PlaylistBuilder/1.0';
+const SHORTS_JITTER_MAX_MS = parseInt(process.env.YT_SHORTS_JITTER_MAX_MS) || 200;
+const SHORTS_HEAD_TIMEOUT_MS = parseInt(process.env.YT_SHORTS_HEAD_TIMEOUT_MS) || 5000;
+const SHORTS_CONCURRENCY = parseInt(process.env.YT_SHORTS_CONCURRENCY) || 20;
 function checkIsShort(videoId) {
   if (Object.prototype.hasOwnProperty.call(shortsCache, videoId)) {
     return Promise.resolve(shortsCache[videoId]);
   }
   return new Promise((resolve) => {
-    // 0-200ms jitter to avoid bursts
     setTimeout(() => {
       const req = https.request(
         `https://www.youtube.com/shorts/${videoId}`,
         {
           method: 'HEAD',
-          timeout: 5000,
+          timeout: SHORTS_HEAD_TIMEOUT_MS,
           headers: { 'User-Agent': UA },
         },
         (res) => {
@@ -71,12 +75,12 @@ function checkIsShort(videoId) {
       req.on('error', () => resolve(false));
       req.on('timeout', () => { req.destroy(); resolve(false); });
       req.end();
-    }, Math.random() * 200);
+    }, Math.random() * SHORTS_JITTER_MAX_MS);
   });
 }
 
 // Check multiple videos in parallel with concurrency limit
-async function filterOutShorts(videos, concurrency = 20) {
+async function filterOutShorts(videos, concurrency = SHORTS_CONCURRENCY) {
   const results = [];
   let shortsCount = 0;
 
