@@ -59,22 +59,14 @@ fn install_x11_error_handler(xlib: &x11_dl::xlib::Xlib) {
     });
 }
 
-// Layout constants (must match app.rs)
-const SIDEBAR_W: f32 = 56.0;
-const CHAT_W: f32 = 340.0;
-const TOPBAR_H: f32 = 36.0;
-const CONTROL_BAR_H: f32 = 48.0;
-const INFOBAR_H: f32 = 36.0;
+// Layout + theme tokens come from `crate::theme`. Local `const` block
+// removed — previously these were duplicated between `player.rs` and
+// `app.rs` with a "must match app.rs" comment (= drift guaranteed).
+use crate::theme::colors::{
+    ACCENT, BAR_BG, BAR_BORDER, BTN_ACTIVE, BTN_HOVER, TEXT_MUTED, TEXT_PRIMARY,
+};
+use crate::theme::layout::{CHAT_W, CONTROL_BAR_H, INFOBAR_H, SIDEBAR_W, TOPBAR_H};
 
-
-// Modern dark theme (spec matches YouTube/Twitch 2024+)
-const BAR_BG: u32 = 0x0f0f11;
-const BAR_BORDER: u32 = 0x1f1f23;
-const BTN_HOVER: u32 = 0x26262b;
-const BTN_ACTIVE: u32 = 0x33333a;
-const TEXT_PRIMARY: u32 = 0xe8e8ea;
-const TEXT_MUTED: u32 = 0xa8a8ad;
-const ACCENT: u32 = 0x9b59b6;
 const ICON_PX: u32 = 20;
 
 /// Extract the YouTube video ID from a URL like "https://www.youtube.com/watch?v=XXXX".

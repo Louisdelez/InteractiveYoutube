@@ -1,13 +1,19 @@
 mod app;
 mod config;
 mod models;
-mod views;
 mod services;
+mod theme;
+mod views;
 
 use gpui::*;
 use gpui_component::Root;
 
 fn main() {
+    // Initialise structured logging first so every subsequent step is
+    // captured (stdout + rotated file in $XDG_DATA_HOME/KoalaTV/logs/
+    // + best-effort forward to server /api/logs). Panics are hooked too.
+    services::logger::init();
+
     // Ensure deno (required by yt-dlp for YouTube JS extraction) is in
     // PATH. yt-dlp looks for it via $PATH; without it, video URLs fail
     // to resolve silently inside mpv's ytdl_hook.
