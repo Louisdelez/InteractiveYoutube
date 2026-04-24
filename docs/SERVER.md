@@ -223,11 +223,12 @@ All from env (`.env` at repo root) or sensible defaults. See `.env.example`.
 | ------------------------- | -------- | ------------------------------------------------------------------------------ |
 | `YOUTUBE_API_KEY`         | ✓        | Google Cloud YouTube Data API v3                                               |
 | `JWT_SECRET`              | ✓        | 32+ byte random hex                                                            |
+| `DATABASE_URL`            | ✓        | `postgresql://user:pass@host:5432/db` — no default; must be explicit.           |
+| `TENOR_API_KEY`           | ✓        | Google Cloud API key with the Tenor API enabled. Used by `/api/gifs/*`.        |
 | `PORT`                    |          | 4500                                                                           |
 | `CLIENT_ORIGIN`           |          | `http://localhost:4501` — CORS allow-list (+ `tauri://localhost`)              |
 | `NODE_ENV`                |          | `development`                                                                  |
 | `REDIS_URL`               |          | `redis://localhost:6379`                                                       |
-| `DATABASE_URL`            |          | `postgresql://interactiveyoutube:interactiveyoutube@localhost:5432/…`          |
 | `DESKTOP_DOWNLOAD_URL`    |          | GitHub releases URL — shown in the web fallback when a video isn't embeddable |
 
 ## Channels

@@ -16,11 +16,12 @@
  * MUST be a single instance (concurrency: 1 inside BullMQ too) or
  * overlapping runs will double-clear the chat.
  */
+// All secrets / connection strings come from the process environment
+// (or a .env file loaded by server/config.js). PM2 passes through the
+// parent env by default, so setting them in your shell / systemd unit
+// / deploy pipeline is enough. Empty strings committed here used to
+// shadow the real value — removed.
 const sharedEnv = {
-  REDIS_URL: process.env.REDIS_URL || 'redis://localhost:6379',
-  DATABASE_URL:
-    process.env.DATABASE_URL ||
-    'postgresql://interactiveyoutube:interactiveyoutube@localhost:5432/interactiveyoutube',
   SERVER_TZ: process.env.SERVER_TZ || 'Europe/Paris',
 };
 
@@ -37,8 +38,6 @@ module.exports = {
         NODE_ENV: 'production',
         PORT: 4500,
         ROLE: 'web',
-        YOUTUBE_API_KEY: '',
-        JWT_SECRET: '',
         CLIENT_ORIGIN: 'https://yourdomain.com',
         ...sharedEnv,
       },
@@ -63,7 +62,6 @@ module.exports = {
       env_production: {
         NODE_ENV: 'production',
         ROLE: 'maint',
-        YOUTUBE_API_KEY: '',
         // Optional: Healthchecks.io dead-man switch. Unset to disable.
         HEALTHCHECKS_URL: '',
         ...sharedEnv,

@@ -20,11 +20,15 @@ const config = {
   CHAT_BATCH_INTERVAL_MS: 150,
   CHAT_RATE_WINDOW_MS: 5000,
   CHAT_RATE_MAX_MESSAGES: 5,
-  // Tenor v2 GIF API — uses a Google Cloud API key (same type as YouTube).
-  // Falls back to the YouTube key if not set separately.
-  TENOR_API_KEY: process.env.TENOR_API_KEY || 'AIzaSyAyimkuYQYF_FXVALexPuGQctUWRURdCYQ',
+  // Tenor v2 GIF API — uses a Google Cloud API key (same type as
+  // YouTube). No fallback: the key is mandatory if the /api/gifs
+  // routes are hit. Missing = boot refuses. Obtain a key from
+  // https://console.cloud.google.com/ and `export TENOR_API_KEY=...`.
+  TENOR_API_KEY: process.env.TENOR_API_KEY,
   REDIS_URL: process.env.REDIS_URL || 'redis://localhost:6379',
-  DATABASE_URL: process.env.DATABASE_URL || 'postgresql://interactiveyoutube:interactiveyoutube@localhost:5432/interactiveyoutube',
+  // Postgres connection string — mandatory, no default credentials.
+  // See `.env.example` and `docs/OPERATIONS.md` for the bootstrap.
+  DATABASE_URL: process.env.DATABASE_URL,
   // Where the web fallback points users who hit a non-embeddable video.
   // Override via env when a release is published.
   DESKTOP_DOWNLOAD_URL:
@@ -216,12 +220,19 @@ const config = {
   ],
 };
 
-const required = ['YOUTUBE_API_KEY', 'JWT_SECRET'];
-for (const key of required) {
-  if (!config[key]) {
-    console.error(`Missing required env var: ${key}`);
-    process.exit(1);
-  }
+const required = [
+  'YOUTUBE_API_KEY',
+  'JWT_SECRET',
+  'DATABASE_URL',
+  'TENOR_API_KEY',
+];
+const missing = required.filter((k) => !config[k]);
+if (missing.length) {
+  console.error(
+    `[config] missing required env vars: ${missing.join(', ')}\n` +
+      `See .env.example and docs/OPERATIONS.md for setup.`
+  );
+  process.exit(1);
 }
 
 module.exports = config;

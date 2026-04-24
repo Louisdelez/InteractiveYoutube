@@ -69,12 +69,17 @@ Multi-stage:
 | ---------------------- | -------- | ----------------------------------------------------------------------- |
 | `YOUTUBE_API_KEY`      | ✓        | YouTube Data API v3, project needs the API enabled.                     |
 | `JWT_SECRET`           | ✓        | `openssl rand -hex 32`                                                  |
-| `DATABASE_URL`         |          | `postgresql://user:pass@host:5432/db` — default assumes the compose DB. |
+| `DATABASE_URL`         | ✓        | `postgresql://user:pass@host:5432/db` — no default; must be explicit.   |
+| `TENOR_API_KEY`        | ✓        | Google Cloud API key with the Tenor API enabled. Used by `/api/gifs/*`. |
 | `REDIS_URL`            |          | `redis://host:6379`                                                     |
 | `PORT`                 |          | 4500                                                                    |
 | `NODE_ENV`             |          | `production` in compose                                                 |
 | `CLIENT_ORIGIN`        |          | Public origin for CORS + cookie `SameSite`                              |
+| `SERVER_TZ`            |          | `Europe/Paris` by default — controls the 3 am maintenance cron.         |
+| `HEALTHCHECKS_URL`     |          | Optional dead-man-switch ping from the maintenance worker.              |
 | `DESKTOP_DOWNLOAD_URL` |          | Served by `/api/tv/desktop-download`, shown in the web fallback        |
+
+All four required vars are enforced in `server/config.js` — the process refuses to boot if any are missing. No silent fallbacks for secrets or credentials: previous commits shipped a leaked Tenor API key and default Postgres credentials as fallbacks; both have been removed. Rotate any key that lived in git history.
 
 Never commit the real `.env` — the template is `.env.example`, and `.env` is gitignored.
 
