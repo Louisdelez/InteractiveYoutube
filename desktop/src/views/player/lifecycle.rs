@@ -137,6 +137,15 @@ impl PlayerView {
                     "memory cache HIT for {} → instant zap",
                     state.channel_id
                 ));
+                // Memory-cache backup is already the visible surface
+                // — no transition window to fill. Drop any pending
+                // channel-switch snapshot so the next render
+                // repositions the backup to the video area (instead
+                // of the -10000 off-screen pin armed by
+                // show_snapshot). Without this the static thumbnail
+                // would sit on top of a live memory-cached video
+                // for the 3-s safety timeout.
+                self.clear_snapshot();
             }
         }
 
