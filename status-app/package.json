@@ -1,0 +1,21 @@
+{
+  "name": "koala-tv-status",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Standalone status page for Koala TV — deployable on its own subdomain (e.g. status.koalatv.com).",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview --port 4502"
+  },
+  "dependencies": {
+    "lucide-react": "^0.475.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.4",
+    "vite": "^6.0.7"
+  }
+}
