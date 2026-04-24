@@ -17,49 +17,6 @@ use crate::views::memory_cache::{MemorizedChannel, MemoryCache};
 #[cfg(target_os = "linux")]
 use crate::views::popup_menu::{MenuEvent, MenuKind, PopupMenu};
 
-// ─── X11 error handling ──────────────────────────────────────────────
-// Without a custom handler, Xlib's default prints the error and calls
-// `exit(1)` — which is exactly the SIGSEGV-looking crash we saw on
-// shutdown (BadWindow on X_DestroyWindow at serial ~112). At teardown
-// time the parent GPUI window may already be gone, so the X server has
-// auto-destroyed our child/sibling windows before our Drop impls run
-// their own XDestroyWindow. That's a benign race, not a real bug —
-// swallow it instead of aborting the process.
-#[cfg(target_os = "linux")]
-static X11_ERROR_HANDLER_INSTALLED: std::sync::Once = std::sync::Once::new();
-#[cfg(target_os = "linux")]
-pub(crate) static X11_SHUTTING_DOWN: std::sync::atomic::AtomicBool =
-    std::sync::atomic::AtomicBool::new(false);
-
-#[cfg(target_os = "linux")]
-unsafe extern "C" fn x11_error_handler(
-    _display: *mut x11_dl::xlib::Display,
-    event: *mut x11_dl::xlib::XErrorEvent,
-) -> std::os::raw::c_int {
-    // During shutdown, swallow everything silently.
-    if X11_SHUTTING_DOWN.load(std::sync::atomic::Ordering::Acquire) {
-        return 0;
-    }
-    let ev = &*event;
-    // Runtime errors: log once and continue (never exit). BadWindow on
-    // a stale resource is recoverable — the default handler aborting
-    // the whole process is worse than a warning.
-    tracing::warn!(
-        code = ev.error_code,
-        request = ev.request_code,
-        resource = format!("0x{:x}", ev.resourceid),
-        "X11 error"
-    );
-    0
-}
-
-#[cfg(target_os = "linux")]
-fn install_x11_error_handler(xlib: &x11_dl::xlib::Xlib) {
-    X11_ERROR_HANDLER_INSTALLED.call_once(|| unsafe {
-        (xlib.XSetErrorHandler)(Some(x11_error_handler));
-    });
-}
-
 // Layout + theme tokens come from `crate::theme`. Local `const` block
 // removed — previously these were duplicated between `player.rs` and
 // `app.rs` with a "must match app.rs" comment (= drift guaranteed).
@@ -88,6 +45,10 @@ use super::player_widgets::{
 mod controls;
 #[cfg(target_os = "linux")]
 mod lifecycle;
+#[cfg(target_os = "linux")]
+mod x11_errors;
+#[cfg(target_os = "linux")]
+use x11_errors::{install_x11_error_handler, X11_SHUTTING_DOWN};
 
 /// Five "default" subtitle languages shown in the captions popup.
 /// User can click "Plus de langues" to see everything else.
