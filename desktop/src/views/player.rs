@@ -761,16 +761,18 @@ impl PlayerView {
     fn apply_geometry(&mut self, x: i32, y: i32, width: u32, height: u32) {
         let changed = self.last_area != Some((x, y, width, height));
         if changed {
-            // Detect a "size change" (vs. a pure move). Resizing the X11
-            // child forces mpv to reconfigure its GL surface, which can
-            // leave audio ~50-150 ms ahead of video on `video-sync=audio`.
-            // After the resize we issue a 0-second exact seek to force a
-            // full A/V buffer rebuild from the current position — the
-            // glitch is hidden inside the resize itself.
-            let size_changed = self
-                .last_area
-                .map(|(_, _, ow, oh)| ow != width || oh != height)
-                .unwrap_or(true);
+            // A/V resync seek on genuine resize was removed : it was
+            // `seek absolute+exact`, which is an **hr-seek** — mpv
+            // re-decodes from the prior keyframe (2-5 s back on
+            // YouTube streams) and drops frames forward to the target.
+            // Visually that's a pause + step-back + rattrapage, which
+            // the user perceives as "la vidéo revient en arrière
+            // constamment" every time GPUI reflows (slider drag,
+            // notify tick, modal show/hide, chat toggle, snapshot
+            // expire). mpv handles GL-surface reconfiguration on
+            // XMoveResizeWindow internally — no client-side resync
+            // seek is actually required.
+            let _ = (width, height);
             self.last_area = Some((x, y, width, height));
             unsafe {
                 (self.xlib.XMoveResizeWindow)(self.display, self.child_window, x, y, width, height);
@@ -792,20 +794,6 @@ impl PlayerView {
                     b.set_geometry(x, y, width, height);
                 } else {
                     b.set_geometry(-10000, -10000, width, height);
-                }
-            }
-            if size_changed {
-                {
-            let mpv = &self.mpv;
-                    if let Ok(pos) = mpv.get_property::<f64>("time-pos") {
-                        // Seek to current pos = full A/V resync, no
-                        // perceptible position change.
-                        mpv_try!(
-                            mpv.command("seek", &[&format!("{}", pos), "absolute+exact"]),
-                            "main A/V resync seek",
-                            pos
-                        );
-                    }
                 }
             }
         }

@@ -239,14 +239,35 @@ pub(super) fn start(
                                                         .as_ref()
                                                         .and_then(|b| b.time_pos())
                                                         .unwrap_or(0.0);
-                                                    let drift = (backup_pos - main_pos).abs();
+                                                    // Signed drift (positive = backup
+                                                    // ahead, negative = backup behind).
+                                                    // Only seek backup FORWARD to
+                                                    // catch up with main — never
+                                                    // backward. When main stalls
+                                                    // mid-playback backup is usually
+                                                    // AHEAD (it kept decoding while
+                                                    // main froze) ; seeking backup
+                                                    // back to main_pos made backup
+                                                    // rewind by the stall duration,
+                                                    // so the user saw the video
+                                                    // replay the last few seconds.
+                                                    // Better to let backup stay on
+                                                    // realtime and skip the content
+                                                    // main was stalled on — the user
+                                                    // wasn't watching it anyway.
+                                                    let drift = main_pos - backup_pos;
                                                     if let Some(b) = p.backup.as_mut() {
-                                                        // Drift-aware: only seek if
-                                                        // backup is >500ms off main.
-                                                        // Within 500ms, mpv just keeps
-                                                        // playing — no decoder flush,
-                                                        // no black flash from hr-seek.
-                                                        if drift > 0.5 && main_pos > 0.5 {
+                                                        // Dead-zone 10s : hard-seek
+                                                        // backup only if it's >10s
+                                                        // BEHIND main. Under 10s, accept
+                                                        // the small forward/backward
+                                                        // jump — industry standard
+                                                        // (Apple TV / Jellyfin / Plex)
+                                                        // is to tolerate a few seconds
+                                                        // of drift rather than nail
+                                                        // the user with a visible
+                                                        // hr-seek hitch.
+                                                        if drift > 10.0 && main_pos > 0.5 {
                                                             b.seek(main_pos);
                                                         }
                                                         b.show();
@@ -263,7 +284,7 @@ pub(super) fn start(
                                                     p.cache_stall_since = None;
                                                     p.backup_since = Some(now);
                                                     log_quality(&format!(
-                                                        "SWAP DOWN t={:.1}s drift={:.0}ms",
+                                                        "SWAP DOWN t={:.1}s drift={:+.0}ms (main-backup)",
                                                         main_pos, drift * 1000.0
                                                     ));
                                                 }
@@ -303,19 +324,37 @@ pub(super) fn start(
                                                     .mpv
                                                     .get_property::<f64>("time-pos")
                                                     .unwrap_or(0.0);
-                                                let drift = (backup_pos - main_pos_now).abs();
-                                                // Drift-aware seek: only realign
-                                                // main to backup if they're more
-                                                // than 300ms apart. Within that
-                                                // window, the inevitable seek-
-                                                // induced black flash is worse
-                                                // than the imperceptible audio
-                                                // drift.
+                                                // Signed drift (positive = backup
+                                                // is ahead of main, negative =
+                                                // main is ahead). Only seek main
+                                                // FORWARD to catch up with backup
+                                                // — never backward. Memory-cache
+                                                // HIT zaps thaw a backup frozen
+                                                // at the last-visit seek_to
+                                                // (potentially MINUTES stale),
+                                                // while main loadfile'd fresh
+                                                // from the server's current
+                                                // seek_to. Seeking main back to
+                                                // the stale backup_pos was the
+                                                // "replays a few seconds (or
+                                                // minutes) earlier" bug.
+                                                let drift = backup_pos - main_pos_now;
                                                 // Unmute main BEFORE the fade —
                                                 // the fade only ramps volume,
                                                 // mute=true would keep us silent.
                                                 mpv_try!(p.mpv.set_property("mute", false), "main unmute (post first-frame)");
-                                                if drift > 0.3 && backup_pos > 0.5 {
+                                                // Dead-zone 10s : forward-catch-up
+                                                // only when main is >10s BEHIND
+                                                // backup (the rare memory-cache
+                                                // miss case where main loadfile
+                                                // raced slowly). Under 10s, don't
+                                                // seek — mpv's time-pos will
+                                                // naturally be close enough that
+                                                // the swap from backup to main is
+                                                // imperceptible. Dead-zone
+                                                // eliminates the "constant small
+                                                // rewind" feel the user reported.
+                                                if drift > 10.0 && backup_pos > 0.5 {
                                                     mpv_try!(
                                                         p.mpv.set_property("time-pos", backup_pos),
                                                         "main drift-align seek",
@@ -340,7 +379,7 @@ pub(super) fn start(
                                                 p.backup_since = None;
                                                 p.cache_stall_since = None;
                                                 log_quality(&format!(
-                                                    "SWAP UP after {:.0}s drift={:.0}ms",
+                                                    "SWAP UP after {:.0}s drift={:+.0}ms (backup-main)",
                                                     elapsed.as_secs_f32(), drift * 1000.0
                                                 ));
                                             }
