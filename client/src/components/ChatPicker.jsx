@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import EmojiPicker from 'emoji-picker-react';
+import { t } from '../i18n';
 import './ChatPicker.css';
 
 const TABS = [
@@ -88,7 +89,7 @@ function GifTab({ onSelect, onClose }) {
       />
       <div className="cpicker-gif-grid">
         {loading ? (
-          <div className="cpicker-empty">Chargement...</div>
+          <div className="cpicker-empty">{t('common.loading')}</div>
         ) : gifs.length === 0 ? (
           <div className="cpicker-empty">Aucun GIF trouve</div>
         ) : (

@@ -125,25 +125,11 @@ pub fn lang_display_name(code: &str) -> &str {
     }
 }
 
-/// Append a debug line to `/tmp/iyt-quality.log` (used to diagnose the
-/// dual-quality fallback). Best-effort, never panics.
+/// Emit a dual-quality fallback debug line through the shared tracing
+/// logger. Routed under target `quality` so log viewers can filter.
+/// Replaces the old `/tmp/iyt-quality.log` hardcoded-path logger.
 pub fn log_quality(msg: &str) {
-    use std::io::Write;
-    if let Ok(mut f) = std::fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open("/tmp/iyt-quality.log")
-    {
-        let _ = writeln!(
-            f,
-            "[{:?}] {}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap_or_default()
-                .as_secs(),
-            msg,
-        );
-    }
+    tracing::debug!(target: "quality", "{}", msg);
 }
 
 /// Locate bundled mpv user-shaders next to the executable. Returns a

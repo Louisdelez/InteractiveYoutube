@@ -109,10 +109,10 @@ function setupSocketIO(httpServer) {
       credentials: true,
     },
     transports: ['websocket', 'polling'],
-    maxHttpBufferSize: 16 * 1024,
-    pingTimeout: 20000,
-    pingInterval: 25000,
-    connectTimeout: 10000,
+    maxHttpBufferSize: parseInt(process.env.SOCKET_MAX_HTTP_BUFFER) || 16 * 1024,
+    pingTimeout: parseInt(process.env.SOCKET_PING_TIMEOUT_MS) || 20000,
+    pingInterval: parseInt(process.env.SOCKET_PING_INTERVAL_MS) || 25000,
+    connectTimeout: parseInt(process.env.SOCKET_CONNECT_TIMEOUT_MS) || 10000,
   });
 
   io.adapter(createAdapter(redisPub, redisSub));
@@ -250,7 +250,10 @@ function setupSocketIO(httpServer) {
 
   // Start the sync broadcast + reconciliation
   startSyncBroadcast(io);
-  reconcileInterval = setInterval(reconcileViewers, 60_000);
+  reconcileInterval = setInterval(
+    reconcileViewers,
+    parseInt(process.env.SOCKET_RECONCILE_INTERVAL_MS) || 60_000,
+  );
 
   return io;
 }

@@ -269,6 +269,23 @@ impl Drop for Inner {
     }
 }
 
+fn socket_dir() -> PathBuf {
+    // Prefer XDG_RUNTIME_DIR (tmpfs, per-user, cleaned up on logout).
+    // Falls back to TMPDIR, then /tmp. Matches the freedesktop spec
+    // and keeps packaged Windows/macOS builds portable later.
+    if let Ok(x) = std::env::var("XDG_RUNTIME_DIR") {
+        if !x.is_empty() {
+            return PathBuf::from(x);
+        }
+    }
+    if let Ok(t) = std::env::var("TMPDIR") {
+        if !t.is_empty() {
+            return PathBuf::from(t);
+        }
+    }
+    PathBuf::from("/tmp")
+}
+
 fn unique_socket_path() -> PathBuf {
     let pid = std::process::id();
     // Nanoseconds from UNIX_EPOCH keep different clients in the same
@@ -278,7 +295,7 @@ fn unique_socket_path() -> PathBuf {
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_nanos())
         .unwrap_or(0);
-    PathBuf::from(format!("/tmp/koala-mpv-{}-{}.sock", pid, ns))
+    socket_dir().join(format!("koala-mpv-{}-{}.sock", pid, ns))
 }
 
 #[cfg(test)]

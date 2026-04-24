@@ -14,7 +14,7 @@
 //!   - `chat:history`     ([msg, …])      full history on connect / channel switch
 //!   - `viewers:count`    ({ count })     viewer count for current channel
 
-use crate::config::SERVER_URL;
+use crate::config::server_url;
 use crate::models::tv_state::TvState;
 use rust_socketio::{ClientBuilder, Payload};
 use serde_json::Value;
@@ -107,7 +107,7 @@ fn run_socket_loop(events: Sender<ServerEvent>, cmd_rx: Receiver<ClientCommand>)
         let ev_cleared = events.clone();
         let ev_disc = events.clone();
 
-        let build = ClientBuilder::new(SERVER_URL)
+        let build = ClientBuilder::new(server_url())
             // Note: rust_socketio uses "open" for the connection-established
             // event, not "connect" (which is the Socket.IO namespace event
             // and isn't fired by this client).

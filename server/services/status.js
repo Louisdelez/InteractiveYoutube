@@ -23,17 +23,23 @@ const { redis } = require('./redis');
 const config = require('../config');
 const log = require('./logger');
 
-const COLLECTOR_INTERVAL_MS = 60 * 1000;
-const YOUTUBE_PROBE_URL = 'https://www.googleapis.com/youtube/v3/videos?part=id&id=dQw4w9WgXcQ&key=';
+// Status-collector knobs — all overridable via env so ops can retune
+// without a redeploy. Defaults match the dev-box baseline; tighten for
+// production.
+const COLLECTOR_INTERVAL_MS = parseInt(process.env.STATUS_COLLECTOR_INTERVAL_MS) || 60 * 1000;
+const YOUTUBE_PROBE_URL =
+  process.env.STATUS_YOUTUBE_PROBE_URL ||
+  'https://www.googleapis.com/youtube/v3/videos?part=id&id=dQw4w9WgXcQ&key=';
 const LOKI_HEALTH_URL = process.env.LOKI_URL || 'http://localhost:3100/ready';
-const DISK_PATH = '/';
+const DISK_PATH = process.env.STATUS_DISK_PATH || '/';
 
 // Thresholds (ms) above which "operational" becomes "degraded".
+// Each lane is individually overridable — e.g. STATUS_LATENCY_REDIS_MS=80.
 const LATENCY_SOFT_MS = {
-  postgres: 150,
-  redis: 50,
-  youtube: 1500,
-  loki: 500,
+  postgres: parseInt(process.env.STATUS_LATENCY_POSTGRES_MS) || 150,
+  redis: parseInt(process.env.STATUS_LATENCY_REDIS_MS) || 50,
+  youtube: parseInt(process.env.STATUS_LATENCY_YOUTUBE_MS) || 1500,
+  loki: parseInt(process.env.STATUS_LATENCY_LOKI_MS) || 500,
 };
 
 // Definition shared with the UI.
@@ -125,7 +131,10 @@ const checkYouTube = withLatency('youtube', async () => {
     return { status: 'degraded', message: 'no API key configured' };
   }
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 4000);
+  const timeout = setTimeout(
+    () => controller.abort(),
+    parseInt(process.env.STATUS_YOUTUBE_TIMEOUT_MS) || 4000,
+  );
   try {
     const res = await fetch(YOUTUBE_PROBE_URL + config.YOUTUBE_API_KEY, {
       signal: controller.signal,
@@ -142,7 +151,9 @@ const checkYouTube = withLatency('youtube', async () => {
   }
 });
 
-const CRON_LOG_PATH = path.resolve(__dirname, '..', '..', 'logs', 'koala-cron.log');
+const CRON_LOG_PATH =
+  process.env.CRON_LOG_PATH ||
+  path.resolve(__dirname, '..', '..', 'logs', 'koala-cron.log');
 const checkCron = withLatency('cron', async () => {
   try {
     const stat = fs.statSync(CRON_LOG_PATH);
@@ -168,7 +179,9 @@ const checkCron = withLatency('cron', async () => {
 });
 
 const checkYtdlp = withLatency('ytdlp', async () => {
-  const binPath = path.resolve(__dirname, '..', '..', 'bin', 'yt-dlp');
+  const binPath =
+    process.env.YTDLP_BIN_PATH ||
+    path.resolve(process.env.YTDLP_BIN_DIR || path.resolve(__dirname, '..', '..', 'bin'), 'yt-dlp');
   if (!fs.existsSync(binPath)) {
     return { status: 'degraded', message: 'binary not found, updater running?' };
   }
@@ -182,7 +195,10 @@ const checkYtdlp = withLatency('ytdlp', async () => {
 
 const checkLoki = withLatency('loki', async () => {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 2000);
+  const timeout = setTimeout(
+    () => controller.abort(),
+    parseInt(process.env.STATUS_LOKI_TIMEOUT_MS) || 2000,
+  );
   try {
     const res = await fetch(LOKI_HEALTH_URL, { signal: controller.signal });
     if (!res.ok) return { status: 'down', message: `HTTP ${res.status}` };

@@ -1,4 +1,4 @@
-use crate::config::SERVER_URL;
+use crate::config::server_url;
 use crate::models::tv_state::TvState;
 use reqwest::blocking::Client;
 use serde::{Deserialize, Serialize};
@@ -42,7 +42,7 @@ struct UserWrapper {
 }
 
 pub fn fetch_me() -> Result<User, String> {
-    let url = format!("{}/api/auth/me", SERVER_URL);
+    let url = format!("{}/api/auth/me", server_url());
     let resp = shared_client().get(&url).send().map_err(|e| e.to_string())?;
     if resp.status().as_u16() == 401 {
         return Err("not_authenticated".into());
@@ -61,7 +61,7 @@ struct LoginPayload<'a> {
 }
 
 pub fn login(email: &str, password: &str) -> Result<User, String> {
-    let url = format!("{}/api/auth/login", SERVER_URL);
+    let url = format!("{}/api/auth/login", server_url());
     let resp = shared_client()
         .post(&url)
         .json(&LoginPayload { email, password })
@@ -88,7 +88,7 @@ struct RegisterPayload<'a> {
 }
 
 pub fn register(username: &str, email: &str, password: &str) -> Result<User, String> {
-    let url = format!("{}/api/auth/register", SERVER_URL);
+    let url = format!("{}/api/auth/register", server_url());
     let resp = shared_client()
         .post(&url)
         .json(&RegisterPayload { username, email, password })
@@ -110,7 +110,7 @@ pub fn register(username: &str, email: &str, password: &str) -> Result<User, Str
 /// Fetch the logged-in user's saved Settings from the server. Returns
 /// `Ok(None)` if not authenticated.
 pub fn fetch_user_settings() -> Result<Option<crate::services::settings::Settings>, String> {
-    let url = format!("{}/api/user/settings", SERVER_URL);
+    let url = format!("{}/api/user/settings", server_url());
     let resp = shared_client().get(&url).send().map_err(|e| e.to_string())?;
     if resp.status().as_u16() == 401 {
         return Ok(None);
@@ -131,7 +131,7 @@ pub fn fetch_user_settings() -> Result<Option<crate::services::settings::Setting
 /// Push the user's Settings to the server. No-op for anonymous users
 /// (server replies 401, which we swallow).
 pub fn put_user_settings(settings: &crate::services::settings::Settings) -> Result<(), String> {
-    let url = format!("{}/api/user/settings", SERVER_URL);
+    let url = format!("{}/api/user/settings", server_url());
     let body = serde_json::json!({ "settings": settings });
     let resp = shared_client()
         .put(&url)
@@ -148,7 +148,7 @@ pub fn put_user_settings(settings: &crate::services::settings::Settings) -> Resu
 }
 
 pub fn logout() -> Result<(), String> {
-    let url = format!("{}/api/auth/logout", SERVER_URL);
+    let url = format!("{}/api/auth/logout", server_url());
     let resp = shared_client().post(&url).send().map_err(|e| e.to_string())?;
     if !resp.status().is_success() {
         return Err(format!("HTTP {}", resp.status()));
@@ -158,7 +158,7 @@ pub fn logout() -> Result<(), String> {
 
 #[allow(dead_code)]
 pub fn fetch_tv_state(channel_id: &str) -> Result<TvState, String> {
-    let url = format!("{}/api/tv/state?channel={}", SERVER_URL, channel_id);
+    let url = format!("{}/api/tv/state?channel={}", server_url(), channel_id);
     let resp = client()?.get(&url).send().map_err(|e| e.to_string())?;
     if !resp.status().is_success() {
         return Err(format!("HTTP {}: {}", resp.status(), url));
@@ -196,7 +196,7 @@ pub struct PlaylistInfo {
 }
 
 pub fn fetch_playlist(channel_id: &str) -> Result<PlaylistInfo, String> {
-    let url = format!("{}/api/tv/playlist?channel={}", SERVER_URL, channel_id);
+    let url = format!("{}/api/tv/playlist?channel={}", server_url(), channel_id);
     let resp = client()?.get(&url).send().map_err(|e| e.to_string())?;
     if !resp.status().is_success() {
         return Err(format!("HTTP {}", resp.status()));
@@ -219,7 +219,7 @@ pub struct GifResult {
 fn default_gif_dim() -> u32 { 100 }
 
 pub fn fetch_trending_gifs() -> Result<Vec<GifResult>, String> {
-    let url = format!("{}/api/gifs/trending", SERVER_URL);
+    let url = format!("{}/api/gifs/trending", server_url());
     let resp = client()?.get(&url).send().map_err(|e| e.to_string())?;
     if !resp.status().is_success() {
         return Err(format!("HTTP {}", resp.status()));
@@ -228,7 +228,7 @@ pub fn fetch_trending_gifs() -> Result<Vec<GifResult>, String> {
 }
 
 pub fn search_gifs(query: &str) -> Result<Vec<GifResult>, String> {
-    let url = format!("{}/api/gifs/search?q={}", SERVER_URL, query);
+    let url = format!("{}/api/gifs/search?q={}", server_url(), query);
     let resp = client()?.get(&url).send().map_err(|e| e.to_string())?;
     if !resp.status().is_success() {
         return Err(format!("HTTP {}", resp.status()));
@@ -237,7 +237,7 @@ pub fn search_gifs(query: &str) -> Result<Vec<GifResult>, String> {
 }
 
 pub fn fetch_channels() -> Result<Vec<ServerChannel>, String> {
-    let url = format!("{}/api/tv/channels", SERVER_URL);
+    let url = format!("{}/api/tv/channels", server_url());
     let resp = client()?.get(&url).send().map_err(|e| e.to_string())?;
     if !resp.status().is_success() {
         return Err(format!("HTTP {}", resp.status()));

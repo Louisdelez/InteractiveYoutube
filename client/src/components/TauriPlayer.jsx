@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
+import { log } from '../services/logger';
+import { t } from '../i18n';
 import './Player.css';
 
 function invoke(cmd, args) {
@@ -61,7 +63,7 @@ export default function TauriPlayer({ tvState, onVideoEnd, clockOffset }) {
           } catch {}
         }, 3000);
       } catch (err) {
-        console.error('[TauriPlayer] Error:', err);
+        log.error('tauri-player error', { err: err && err.message ? err.message : String(err) });
       }
     }
 
@@ -134,7 +136,7 @@ export default function TauriPlayer({ tvState, onVideoEnd, clockOffset }) {
 
   return (
     <div ref={containerRef} className="tauri-player-container">
-      <div className="tauri-player-loading">Chargement...</div>
+      <div className="tauri-player-loading">{t('common.loading')}</div>
     </div>
   );
 }

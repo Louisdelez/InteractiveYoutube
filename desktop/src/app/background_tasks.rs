@@ -230,7 +230,7 @@ pub(super) fn latency_probe(
                         .timeout(Duration::from_millis(1500))
                         .build()
                         .ok();
-                    let url = format!("{}/health", crate::config::SERVER_URL);
+                    let url = format!("{}/health", crate::config::server_url());
                     loop {
                         let result = client.as_ref().and_then(|c| {
                             let start = std::time::Instant::now();

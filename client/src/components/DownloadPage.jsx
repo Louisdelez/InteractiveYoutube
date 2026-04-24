@@ -9,10 +9,12 @@ function GithubIcon({ size = 14 }) {
     </svg>
   );
 }
+import { t } from '../i18n';
 import './DownloadPage.css';
 
-const REPO_API = 'https://api.github.com/repos/Louisdelez/KoalaTV/releases/latest';
-const REPO_RELEASES = 'https://github.com/Louisdelez/KoalaTV/releases';
+const REPO_SLUG = import.meta.env.VITE_REPO_SLUG || 'Louisdelez/KoalaTV';
+const REPO_API = `https://api.github.com/repos/${REPO_SLUG}/releases/latest`;
+const REPO_RELEASES = `https://github.com/${REPO_SLUG}/releases`;
 
 // Fallback hardcoded to v1.0.0 if the GitHub API is rate-limited or offline.
 const FALLBACK = {
@@ -161,7 +163,7 @@ export default function DownloadPage({ onBack }) {
           <span>Retour</span>
         </button>
         <div className="dl-header-meta">
-          {loading ? 'Chargement…' : (
+          {loading ? t('common.loading') : (
             <>
               Version <strong>{release.tag_name}</strong>
             </>

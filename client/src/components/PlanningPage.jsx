@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { ArrowLeft, ChevronLeft, ChevronRight, Clock } from 'lucide-react';
 import { api } from '../services/api';
 import socket from '../services/socket';
+import { t } from '../i18n';
 import './PlanningPage.css';
 
 const DAY_NAMES_SHORT = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
@@ -233,7 +234,7 @@ export default function PlanningPage({ onBack, channelId, channels }) {
       {error && <div className="pl-error">{error}</div>}
 
       {!playlist && !error && (
-        <div className="pl-loading">Chargement du planning…</div>
+        <div className="pl-loading">{t('planning.loading')}</div>
       )}
 
       {playlist && (

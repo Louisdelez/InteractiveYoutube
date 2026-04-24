@@ -4,9 +4,9 @@ const log = require('./services/logger').child({ component: 'db' });
 
 const pool = new Pool({
   connectionString: config.DATABASE_URL,
-  max: 20, // Max connections in pool
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 5000,
+  max: parseInt(process.env.PG_POOL_MAX) || 20,
+  idleTimeoutMillis: parseInt(process.env.PG_POOL_IDLE_MS) || 30000,
+  connectionTimeoutMillis: parseInt(process.env.PG_POOL_CONNECT_MS) || 5000,
 });
 
 pool.on('error', (err) => {

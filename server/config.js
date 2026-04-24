@@ -6,20 +6,20 @@ const config = {
   PORT: parseInt(process.env.PORT) || 4500,
   CLIENT_ORIGIN: process.env.CLIENT_ORIGIN || 'http://localhost:4501',
   NODE_ENV: process.env.NODE_ENV || 'development',
-  RSS_POLL_INTERVAL_MS: 30 * 60 * 1000,
+  RSS_POLL_INTERVAL_MS: parseInt(process.env.RSS_POLL_INTERVAL_MS) || 30 * 60 * 1000,
   // Every day at 3am: refresh 1/7th of the channels + restart process.
   // Spreads API quota over the week and keeps the server fresh.
-  DAILY_REFRESH_CRON: '0 3 * * *',
+  DAILY_REFRESH_CRON: process.env.DAILY_REFRESH_CRON || '0 3 * * *',
   // Timezone for the daily cron + chat message timestamps. Defaults
   // to the process TZ (`process.env.TZ` / host). Set explicitly in prod
   // (e.g. "Europe/Paris") so Docker containers don't drift to UTC.
   SERVER_TZ: process.env.SERVER_TZ || process.env.TZ || 'Europe/Paris',
-  DRIFT_CORRECTION_INTERVAL_MS: 15000,
-  CHAT_RATE_LIMIT_MS: 1000,
-  CHAT_BUFFER_SIZE: 200,
-  CHAT_BATCH_INTERVAL_MS: 150,
-  CHAT_RATE_WINDOW_MS: 5000,
-  CHAT_RATE_MAX_MESSAGES: 5,
+  DRIFT_CORRECTION_INTERVAL_MS: parseInt(process.env.DRIFT_CORRECTION_INTERVAL_MS) || 15000,
+  CHAT_RATE_LIMIT_MS: parseInt(process.env.CHAT_RATE_LIMIT_MS) || 1000,
+  CHAT_BUFFER_SIZE: parseInt(process.env.CHAT_BUFFER_SIZE) || 200,
+  CHAT_BATCH_INTERVAL_MS: parseInt(process.env.CHAT_BATCH_INTERVAL_MS) || 150,
+  CHAT_RATE_WINDOW_MS: parseInt(process.env.CHAT_RATE_WINDOW_MS) || 5000,
+  CHAT_RATE_MAX_MESSAGES: parseInt(process.env.CHAT_RATE_MAX_MESSAGES) || 5,
   // Tenor v2 GIF API — uses a Google Cloud API key (same type as
   // YouTube). No fallback: the key is mandatory if the /api/gifs
   // routes are hit. Missing = boot refuses. Obtain a key from

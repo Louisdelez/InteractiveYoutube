@@ -2,9 +2,12 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { useSocket } from './hooks/useSocket';
 import { useAuth } from './hooks/useAuth';
 import { useTvSync } from './hooks/useTvSync';
+import { log } from './services/logger';
+import { t } from './i18n';
 import { MessageSquare, MessageSquareOff, LogIn, LogOut, User, Search } from 'lucide-react';
 
-const REPO_URL = 'https://github.com/Louisdelez/InteractiveYoutube';
+const REPO_URL =
+  import.meta.env.VITE_REPO_URL || 'https://github.com/Louisdelez/KoalaTV';
 
 function GithubIcon({ size = 15 }) {
   return (
@@ -97,7 +100,7 @@ export default function TauriApp() {
           } catch {}
         }, 3000);
       } catch (err) {
-        console.error('[TauriApp] YouTube error:', err);
+        log.error('tauri-app: youtube error', { err: err && err.message ? err.message : String(err) });
       }
     }
 
@@ -182,7 +185,7 @@ export default function TauriApp() {
         <div className="tauri-topbar-right">
           <button className="tauri-btn" onClick={() => setChatOpen(!chatOpen)}>
             {chatOpen ? <MessageSquareOff size={15} /> : <MessageSquare size={15} />}
-            <span>{chatOpen ? 'Masquer' : 'Chat'}</span>
+            <span>{chatOpen ? t('topbar.hide_chat') : t('chat.title')}</span>
           </button>
           {user ? (
             <div className="tauri-user">
@@ -192,7 +195,7 @@ export default function TauriApp() {
             </div>
           ) : (
             <button className="tauri-btn tauri-btn-accent" onClick={() => setShowAuth(true)}>
-              <LogIn size={14} /><span>Connexion</span>
+              <LogIn size={14} /><span>{t('topbar.connect.label')}</span>
             </button>
           )}
         </div>
@@ -213,7 +216,7 @@ export default function TauriApp() {
         {/* BLOCK 2: YouTube Player Zone (empty — YouTube window overlays here) */}
         <div className="tauri-player-zone">
           <div className="tauri-player-area" ref={playerZoneRef}>
-            {isLoading && <div className="tauri-player-msg">Chargement...</div>}
+            {isLoading && <div className="tauri-player-msg">{t('common.loading')}</div>}
             {!isLoading && !tvState && <div className="tauri-player-msg">Playlist non disponible</div>}
           </div>
           {tvState && (
@@ -238,7 +241,7 @@ export default function TauriApp() {
       </div>
 
       {/* Banners */}
-      {!isConnected && <div className="tauri-banner-error">Reconnexion en cours...</div>}
+      {!isConnected && <div className="tauri-banner-error">{t('status.reconnecting_progress')}</div>}
       {showAuth && (
         <AuthModal onClose={() => setShowAuth(false)} onLogin={login} onRegister={register} />
       )}

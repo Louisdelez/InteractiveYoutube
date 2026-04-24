@@ -59,6 +59,17 @@
   "status.server_down": "Serveur indisponible",
   "status.server_down_body": "Connexion au serveur perdue. L'application reprendra automatiquement dès que le serveur sera accessible.",
   "status.reconnecting": "Reconnexion…",
+  "status.reconnecting_progress": "Reconnexion en cours…",
+  "status.back": "Retour",
+  "status.loading_status": "Chargement…",
+  "status.load_error": "Impossible de charger le statut.",
+
+  "error.boundary_title": "Koala TV — erreur",
+  "error.boundary_body": "Une erreur inattendue s'est produite. Essaie de recharger.",
+  "error.reload": "Recharger",
+
+  "download.loading": "Chargement…",
+  "download.fetch_error": "Impossible de récupérer la dernière version.",
 
   "settings.title": "Paramètres",
   "settings.memory.title": "Mémoire — chaînes pré-chargées",

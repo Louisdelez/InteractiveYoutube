@@ -10,12 +10,15 @@ const https = require('https');
 const { spawn } = require('child_process');
 const log = require('./logger');
 
-const BIN_DIR = path.resolve(__dirname, '../../bin');
+const BIN_DIR = process.env.YTDLP_BIN_DIR || path.resolve(__dirname, '../../bin');
 const BIN_PATH = path.join(BIN_DIR, 'yt-dlp');
 const DOWNLOAD_URL =
+  process.env.YTDLP_DOWNLOAD_URL ||
   'https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp';
-const UPDATE_INTERVAL_MS = 6 * 60 * 60 * 1000; // 6 h
-const SPAWN_TIMEOUT_MS = 120_000;
+const UPDATE_INTERVAL_MS =
+  parseInt(process.env.YTDLP_UPDATE_INTERVAL_MS) || 6 * 60 * 60 * 1000;
+const SPAWN_TIMEOUT_MS =
+  parseInt(process.env.YTDLP_SPAWN_TIMEOUT_MS) || 120_000;
 
 function download(url, dest, redirects = 0) {
   return new Promise((resolve, reject) => {

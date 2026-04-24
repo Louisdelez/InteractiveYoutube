@@ -35,8 +35,8 @@ const JOB_WARNING = 'maintenance-warning';
 const SCHED_DAILY = 'koala-daily-3am';
 const SCHED_WARNING = 'koala-daily-2h55-warning';
 
-const CKPT_TTL_SECS = 6 * 3600; // 6 h — orphan cleanup on stuck jobs
-const REFRESH_TIMEOUT_MS = 60_000;
+const CKPT_TTL_SECS = parseInt(process.env.MAINT_CKPT_TTL_SECS) || 6 * 3600;
+const REFRESH_TIMEOUT_MS = parseInt(process.env.MAINT_REFRESH_TIMEOUT_MS) || 60_000;
 
 // Server-side source of truth for the maintenance banner. A client
 // that reconnects mid-maintenance (or after missing `maintenance:end`
@@ -209,12 +209,15 @@ async function start() {
   // cron pattern / opts in place without creating duplicates.
   await queue.upsertJobScheduler(
     SCHED_DAILY,
-    { pattern: '0 3 * * *', tz: config.SERVER_TZ },
+    { pattern: config.DAILY_REFRESH_CRON, tz: config.SERVER_TZ },
     {
       name: JOB_DAILY,
       opts: {
-        attempts: 3,
-        backoff: { type: 'exponential', delay: 60_000 },
+        attempts: parseInt(process.env.MAINT_JOB_ATTEMPTS) || 3,
+        backoff: {
+          type: 'exponential',
+          delay: parseInt(process.env.MAINT_JOB_BACKOFF_MS) || 60_000,
+        },
         removeOnComplete: { age: 7 * 24 * 3600, count: 50 },
         removeOnFail: { age: 30 * 24 * 3600, count: 200 },
       },
@@ -223,7 +226,10 @@ async function start() {
 
   await queue.upsertJobScheduler(
     SCHED_WARNING,
-    { pattern: '55 2 * * *', tz: config.SERVER_TZ },
+    {
+      pattern: process.env.DAILY_WARNING_CRON || '55 2 * * *',
+      tz: config.SERVER_TZ,
+    },
     {
       name: JOB_WARNING,
       opts: { removeOnComplete: true, removeOnFail: { count: 10 } },
@@ -240,7 +246,7 @@ async function start() {
     {
       connection: createConnection(),
       concurrency: 1, // one maintenance at a time, period
-      lockDuration: 10 * 60 * 1000, // 10 min — refreshPlaylist can be slow
+      lockDuration: parseInt(process.env.MAINT_LOCK_DURATION_MS) || 10 * 60 * 1000,
     }
   );
 
