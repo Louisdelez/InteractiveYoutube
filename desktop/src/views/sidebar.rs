@@ -15,6 +15,19 @@ const AVATAR_NOOB: &[u8] = include_bytes!("../../assets/noob.jpg");
 const AVATAR_PIERRE_CHABRIER: &[u8] = include_bytes!("../../assets/pierre-chabrier.jpg");
 const AVATAR_HITS_DU_MOMENT: &[u8] = include_bytes!("../../assets/hits-du-moment.png");
 
+/// Avatar bytes for channels whose artwork is bundled in the binary
+/// (server returns relative `/avatars/*` paths for these three). Shared
+/// with `AppView::avatar_bytes` so the "now playing" badge works
+/// instantly for them — otherwise an HTTP fetch to `/avatars/...`
+/// would 404 in dev and the badge would stay hidden.
+pub fn embedded_avatar_bytes() -> Vec<(&'static str, Vec<u8>)> {
+    vec![
+        ("noob", AVATAR_NOOB.to_vec()),
+        ("pierre-chabrier", AVATAR_PIERRE_CHABRIER.to_vec()),
+        ("hits-du-moment", AVATAR_HITS_DU_MOMENT.to_vec()),
+    ]
+}
+
 /// Event emitted when user clicks a channel in the sidebar.
 #[derive(Clone, Debug)]
 pub struct ChannelSelected {
@@ -158,10 +171,15 @@ impl SidebarView {
             new_channels.iter().map(|c| c.id.as_str()).collect();
         self.avatars.retain(|k, _| valid_ids.contains(k.as_str()));
 
-        // Preserve the currently-selected channel across the remap. If
-        // the current id is still present → keep it. Otherwise pick a
-        // fresh random so the user doesn't get silently bumped to
-        // channel 0.
+        // Preserve the currently-selected channel across the remap.
+        // If the current id is still present → keep it. Otherwise
+        // fall back to index 0 — **never** pick a random local
+        // channel here : the server is the source of truth for which
+        // chaîne is currently playing, and its first `tv:state` will
+        // call `set_selected_by_id` to sync the highlight with the
+        // stream. Picking randomly here caused the sidebar to
+        // highlight (e.g.) Popcorn while the player was actually
+        // streaming Youyou.
         let current_id = self
             .channels
             .get(self.selected)
@@ -173,15 +191,20 @@ impl SidebarView {
                 return;
             }
         }
-        self.selected = if self.channels.is_empty() {
-            0
+        self.selected = 0;
+    }
+
+    /// Align the sidebar highlight with the channel the server
+    /// reports as currently playing. Called from the `tv:state`
+    /// dispatch path so the sidebar tracks the stream, not a locally-
+    /// picked default. No-op if `id` isn't in the list (yet).
+    pub fn set_selected_by_id(&mut self, id: &str) -> bool {
+        if let Some(ix) = self.channels.iter().position(|c| c.id == id) {
+            self.selected = ix;
+            true
         } else {
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .map(|d| d.subsec_nanos() as usize)
-                .unwrap_or(0)
-                % self.channels.len()
-        };
+            false
+        }
     }
 
     pub fn set_avatar(&mut self, channel_id: String, image: Arc<Image>) {

@@ -279,7 +279,19 @@ impl AppView {
                 hover_preload_version: std::cell::Cell::new(0),
                 current_channel_id: initial_channel_id,
                 pending_channel_switch: None,
-                avatar_bytes: std::collections::HashMap::new(),
+                avatar_bytes: {
+                    // Seed with embedded bundle-local avatars so the
+                    // "now playing" badge works instantly for channels
+                    // whose server-returned avatar URL is a relative
+                    // `/avatars/*` path (would 404 in dev). HTTP-fetched
+                    // YouTube CDN avatars get inserted later by the
+                    // `channels_and_avatars` background task.
+                    let mut m = std::collections::HashMap::new();
+                    for (id, bytes) in crate::views::sidebar::embedded_avatar_bytes() {
+                        m.insert(id.to_string(), bytes);
+                    }
+                    m
+                },
                 // Bootstrap from the last session's snapshot. Stale
                 // values get overwritten by the HTTP prefetch + live
                 // tv:state / tv:sync stream moments later; having them

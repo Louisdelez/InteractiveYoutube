@@ -94,6 +94,20 @@ pub(super) fn start(
                                                 e.update(cx, |this, cx| {
                                                     this.last_state_per_channel
                                                         .insert(state.channel_id.clone(), state.clone());
+                                                    // Align the sidebar highlight
+                                                    // with the stream : on boot the
+                                                    // server picks a random default
+                                                    // channel and emits the first
+                                                    // tv:state for it ; without this
+                                                    // sync, the sidebar would keep
+                                                    // highlighting whatever local
+                                                    // index it started on (often a
+                                                    // completely different chaîne).
+                                                    this.sidebar.update(cx, |s, cx| {
+                                                        if s.set_selected_by_id(&state.channel_id) {
+                                                            cx.notify();
+                                                        }
+                                                    });
                                                     super::background_tasks::broadcast_remote_state(this, cx);
                                                     // If this channel is a favorite and
                                                     // its thumbnail cache is missing or
