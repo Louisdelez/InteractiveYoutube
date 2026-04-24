@@ -2,6 +2,7 @@ const express = require('express');
 const { getUserSettings, setUserSettings } = require('../db');
 const { requireAuth } = require('../middleware/auth');
 const log = require('../services/logger');
+const { t } = require('../i18n/fr');
 
 const router = express.Router();
 
@@ -16,14 +17,14 @@ router.get('/settings', requireAuth, async (req, res) => {
     res.json({ settings });
   } catch (err) {
     log.error({ err: err.message, user: req.user.id }, 'get settings failed');
-    res.status(500).json({ error: 'Erreur serveur.' });
+    res.status(500).json({ error: t('user.error.server') });
   }
 });
 
 router.put('/settings', requireAuth, async (req, res) => {
   const settings = req.body && req.body.settings;
   if (!settings || typeof settings !== 'object') {
-    return res.status(400).json({ error: 'Settings invalides.' });
+    return res.status(400).json({ error: t('user.error.invalid_settings') });
   }
   // Light validation so we don't store nonsense.
   const safe = {};
@@ -44,7 +45,7 @@ router.put('/settings', requireAuth, async (req, res) => {
     res.json({ ok: true, settings: safe });
   } catch (err) {
     log.error({ err: err.message, user: req.user.id }, 'put settings failed');
-    res.status(500).json({ error: 'Erreur serveur.' });
+    res.status(500).json({ error: t('user.error.server') });
   }
 });
 
