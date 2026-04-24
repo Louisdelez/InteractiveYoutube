@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160" viewBox="0 0 160 160">
+  <defs>
+    <radialGradient id="g" cx="0.35" cy="0.3" r="0.85">
+      <stop offset="0%" stop-color="#c084fc"/>
+      <stop offset="60%" stop-color="#9333ea"/>
+      <stop offset="100%" stop-color="#581c87"/>
+    </radialGradient>
+  </defs>
+  <circle cx="80" cy="80" r="78" fill="url(#g)"/>
+  <!-- Music note : eighth note with a gentle beam.
+       Bodies are two ellipses, stems are rounded rects. -->
+  <g fill="#ffffff">
+    <ellipse cx="60" cy="108" rx="14" ry="10" transform="rotate(-18 60 108)"/>
+    <ellipse cx="106" cy="100" rx="14" ry="10" transform="rotate(-18 106 100)"/>
+    <rect x="72" y="48" width="6" height="60" rx="2"/>
+    <rect x="118" y="40" width="6" height="60" rx="2"/>
+    <path d="M72 48 L124 40 L124 54 L72 62 Z"/>
+  </g>
+</svg>

@@ -80,11 +80,27 @@ async function runDailyMaintenance(job) {
       await redis.expire(ckptKey, CKPT_TTL_SECS);
     }
 
-    // ── Step 2: Refresh playlists (1/7 bucket) ─────────────────
+    // ── Step 2: Refresh playlists (1/7 bucket + daily for dynamic feeds) ─
     if (!done.refresh) {
       const day = new Date().getDay();
-      const bucket = config.CHANNELS.filter((_, i) => i % 7 === day);
-      log.info({ day, count: bucket.length, total: config.CHANNELS.length }, '[2/5] refresh bucket');
+      const weekly = config.CHANNELS.filter((_, i) => i % 7 === day);
+      // Dynamic-feed channels (e.g. "hits-feed" for Hits du Moment)
+      // MUST refresh every day — their content turnover is fast
+      // (daily chart churn) and a 7-day staleness window would make
+      // the channel look abandoned. Always included on top of the
+      // regular bucket, deduped so we don't refresh twice.
+      const dailySet = new Set(
+        config.CHANNELS.filter((c) => c.kind === 'hits-feed').map((c) => c.id),
+      );
+      const weeklyIds = new Set(weekly.map((c) => c.id));
+      const extras = config.CHANNELS.filter(
+        (c) => dailySet.has(c.id) && !weeklyIds.has(c.id),
+      );
+      const bucket = [...weekly, ...extras];
+      log.info(
+        { day, count: bucket.length, total: config.CHANNELS.length, dailyForced: extras.length },
+        '[2/5] refresh bucket',
+      );
       let ok = 0, fail = 0;
       for (const channel of bucket) {
         try {

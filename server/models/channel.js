@@ -169,7 +169,58 @@ class FixedVideoChannel extends Channel {
   // No pollRss override — fixed playlists don't auto-update.
 }
 
+/**
+ * Hits du Moment — dynamic feed. `fetchVideoIds()` calls Deezer's
+ * chart API for the top N tracks, then resolves each (artist, title)
+ * to a YouTube video ID via yt-dlp's `ytsearch1:` (cached in Redis
+ * 90 d to avoid re-searching between refreshes). Shuffled, short/
+ * live-filtered like a normal channel. No RSS poll — the daily
+ * maintenance rebuild is enough for chart churn. The refresh pipeline
+ * always includes this channel, ignoring the 1-in-7 bucket that
+ * spreads YouTube-API quota across the week.
+ */
+class HitsFeedChannel extends Channel {
+  constructor(raw) {
+    super(raw);
+    this.limit = raw.tracksLimit || 50;
+    this.chartId = typeof raw.deezerChartId === 'number' ? raw.deezerChartId : 0;
+    this.searchConcurrency = raw.searchConcurrency || 4;
+  }
+  get kind() {
+    return 'hits-feed';
+  }
+  get shuffle() {
+    return true;
+  }
+  get detailsOpts() {
+    // Music clips are typically > 1 min; Shorts would be the
+    // occasional 30-s teaser. Filter them out like Normal channels do.
+    return {};
+  }
+  async fetchVideoIds() {
+    const deezer = require('../services/deezer');
+    const { searchMany } = require('../services/music_search');
+    const hits = await deezer.fetchTopHits(this.limit, this.chartId);
+    if (hits.length === 0) return [];
+    const resolved = await searchMany(hits, this.searchConcurrency);
+    // Preserve chart order for traceability (buildPlaylist shuffles
+    // after this). Dedupe in case two chart entries map to the same
+    // clip (rare, happens with remixes).
+    const ids = [];
+    const seen = new Set();
+    for (const t of hits) {
+      const id = resolved.get(t);
+      if (id && !seen.has(id)) {
+        seen.add(id);
+        ids.push(id);
+      }
+    }
+    return ids;
+  }
+}
+
 function fromConfig(raw) {
+  if (raw.kind === 'hits-feed') return new HitsFeedChannel(raw);
   if (raw.ordered && raw.fixedVideoIds) return new FixedVideoChannel(raw);
   if (raw.ordered && raw.youtubePlaylists) return new OrderedPlaylistChannel(raw);
   return new NormalChannel(raw);
@@ -184,6 +235,7 @@ module.exports = {
   NormalChannel,
   OrderedPlaylistChannel,
   FixedVideoChannel,
+  HitsFeedChannel,
   fromConfig,
   loadAll,
 };

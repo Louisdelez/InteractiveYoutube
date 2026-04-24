@@ -1,5 +1,14 @@
 [
   {
+    "id": "hits-du-moment",
+    "name": "Hits du Moment",
+    "handle": "",
+    "kind": "hits-feed",
+    "tracksLimit": 50,
+    "deezerChartId": 0,
+    "avatar": "/avatars/hits-du-moment.png"
+  },
+  {
     "id": "amixem",
     "name": "Amixem",
     "handle": "Amixem",
