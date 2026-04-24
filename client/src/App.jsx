@@ -4,13 +4,16 @@ import { api } from './services/api';
 import { useSocket } from './hooks/useSocket';
 import { useAuth } from './hooks/useAuth';
 import { usePing } from './hooks/usePing';
-import { MessageSquare, MessageSquareOff, LogIn, LogOut, User, Search, Download, Info, Eye, Calendar } from 'lucide-react';
+import { MessageSquare, MessageSquareOff, LogIn, LogOut, User, Search, Download, Info, Eye, Calendar, Activity } from 'lucide-react';
 import DownloadPage from './components/DownloadPage';
 import AboutPage from './components/AboutPage';
 import PlanningPage from './components/PlanningPage';
+import StatusPage from './components/StatusPage';
 import SignalBars from './components/SignalBars';
+import { t } from './i18n';
 
-const REPO_URL = 'https://github.com/Louisdelez/KoalaTV';
+const REPO_URL =
+  import.meta.env.VITE_REPO_URL || 'https://github.com/Louisdelez/KoalaTV';
 
 // Inline Lucide github icon — the installed lucide-react build doesn't
 // export `Github` as a named icon, so we ship the SVG ourselves.
@@ -80,7 +83,7 @@ export default function App() {
   useEffect(() => {
     const onTotal = ({ total }) => setTotalViewers(total);
     const onMaintStart = () => { setMaintWarning(false); setMaintenance(true); };
-    const onMaintEnd = () => setMaintenance(false);
+    const onMaintEnd = () => { setMaintenance(false); setMaintWarning(false); };
     const onMaintWarn = () => setMaintWarning(true);
     socket.on('viewers:total', onTotal);
     socket.on('maintenance:start', onMaintStart);
@@ -167,6 +170,10 @@ export default function App() {
     );
   }
 
+  if (route === '#status') {
+    return <StatusPage onBack={() => { window.location.hash = ''; }} />;
+  }
+
   return (
     <div className="app">
       <div className="top-bar">
@@ -205,6 +212,14 @@ export default function App() {
             <Info size={13} />
             <span>À propos</span>
           </a>
+          <a
+            href="#status"
+            className="top-bar-about"
+            title="État des services Koala TV"
+          >
+            <Activity size={13} />
+            <span>Status</span>
+          </a>
         </div>
         <div className="top-bar-search">
           <Search size={14} />
@@ -223,7 +238,7 @@ export default function App() {
           </a>
           <button className="chat-toggle" onClick={() => setChatOpen(!chatOpen)}>
             {chatOpen ? <MessageSquareOff size={15} /> : <MessageSquare size={15} />}
-            <span>{chatOpen ? 'Masquer le chat' : 'Afficher le chat'}</span>
+            <span>{chatOpen ? t('topbar.hide_chat') : t('topbar.show_chat')}</span>
           </button>
           {user ? (
             <div className="top-bar-user">
@@ -236,7 +251,7 @@ export default function App() {
           ) : (
             <button className="top-bar-login" onClick={() => setShowAuth(true)}>
               <LogIn size={14} />
-              <span>Connexion</span>
+              <span>{t('topbar.connect.label')}</span>
             </button>
           )}
           <SignalBars ping={ping} />
@@ -266,7 +281,7 @@ export default function App() {
       </div>
       {!isConnected && (
         <div className="connection-banner">
-          Reconnexion en cours...
+          {t('status.reconnecting_progress')}
         </div>
       )}
       {showAuth && (

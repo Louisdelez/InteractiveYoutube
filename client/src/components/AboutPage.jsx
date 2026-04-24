@@ -1,4 +1,5 @@
 import { ArrowLeft, Download, ExternalLink, Tv, Users, MessageSquare, Zap, RefreshCw, Shield, Layers, Globe } from 'lucide-react';
+import { t } from '../i18n';
 import './AboutPage.css';
 
 function GithubIcon({ size = 14 }) {
@@ -72,7 +73,7 @@ export default function AboutPage({ onBack, onDownload }) {
       <header className="ab-header">
         <button className="ab-back" onClick={onBack}>
           <ArrowLeft size={16} />
-          <span>Retour</span>
+          <span>{t('status.back')}</span>
         </button>
         <a
           href="https://github.com/Louisdelez/KoalaTV"

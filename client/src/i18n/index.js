@@ -13,17 +13,24 @@ import fr from '../../../shared/i18n/fr.json';
 
 const bundle = fr;
 
-export function t(key) {
+export function t(key, params) {
   const value = bundle[key];
-  if (typeof value === 'string') return value;
-  // Key not found — log once per key to aid detection.
-  if (!t._warned) t._warned = new Set();
-  if (!t._warned.has(key)) {
-    t._warned.add(key);
-    // eslint-disable-next-line no-console
-    console.warn(`[i18n] missing key: ${key}`);
+  if (typeof value !== 'string') {
+    // Key not found — log once per key to aid detection.
+    if (!t._warned) t._warned = new Set();
+    if (!t._warned.has(key)) {
+      t._warned.add(key);
+      // eslint-disable-next-line no-console
+      console.warn(`[i18n] missing key: ${key}`);
+    }
+    return key;
   }
-  return key;
+  if (!params) return value;
+  // Interpolate `{name}` placeholders. Missing keys in `params` are
+  // left in the output as-is (visible in UI = easier to notice).
+  return value.replace(/\{(\w+)\}/g, (m, k) =>
+    Object.prototype.hasOwnProperty.call(params, k) ? String(params[k]) : m,
+  );
 }
 
 export default { t };

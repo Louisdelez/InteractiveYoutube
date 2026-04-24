@@ -8,27 +8,27 @@ import './StatusPage.css';
 const POLL_MS = parseInt(import.meta.env.VITE_STATUS_POLL_MS) || 30_000;
 
 const STATUS_META = {
-  operational:    { label: 'Operational',    cls: 'st-ok' },
-  degraded:       { label: 'Degraded',       cls: 'st-warn' },
-  down:           { label: 'Down',           cls: 'st-bad' },
-  unknown:        { label: 'No data',        cls: 'st-unknown' },
+  operational:    { labelKey: 'status.component.operational', cls: 'st-ok' },
+  degraded:       { labelKey: 'status.component.degraded',    cls: 'st-warn' },
+  down:           { labelKey: 'status.component.down',        cls: 'st-bad' },
+  unknown:        { labelKey: 'status.component.unknown',     cls: 'st-unknown' },
 };
 
 const OVERALL_META = {
-  operational:     { label: 'All Systems Operational', cls: 'banner-ok',   Icon: CheckCircle2 },
-  degraded:        { label: 'Some Systems Degraded',   cls: 'banner-warn', Icon: AlertTriangle },
-  partial_outage:  { label: 'Partial Outage',          cls: 'banner-warn', Icon: AlertTriangle },
-  major_outage:    { label: 'Major Outage',            cls: 'banner-bad',  Icon: AlertOctagon },
+  operational:     { labelKey: 'status.banner.all_operational', cls: 'banner-ok',   Icon: CheckCircle2 },
+  degraded:        { labelKey: 'status.banner.some_degraded',   cls: 'banner-warn', Icon: AlertTriangle },
+  partial_outage:  { labelKey: 'status.banner.partial_outage',  cls: 'banner-warn', Icon: AlertTriangle },
+  major_outage:    { labelKey: 'status.banner.major_outage',    cls: 'banner-bad',  Icon: AlertOctagon },
 };
 
 function relativeTime(iso) {
   if (!iso) return '';
   const d = new Date(iso);
   const s = Math.round((Date.now() - d.getTime()) / 1000);
-  if (s < 10) return 'à l\'instant';
-  if (s < 60) return `il y a ${s}s`;
-  if (s < 3600) return `il y a ${Math.round(s / 60)} min`;
-  if (s < 86400) return `il y a ${Math.round(s / 3600)} h`;
+  if (s < 10) return t('status.time.just_now');
+  if (s < 60) return t('status.time.seconds_ago', { s });
+  if (s < 3600) return t('status.time.minutes_ago', { m: Math.round(s / 60) });
+  if (s < 86400) return t('status.time.hours_ago', { h: Math.round(s / 3600) });
   return d.toLocaleDateString();
 }
 
@@ -82,9 +82,9 @@ export default function StatusPage({ onBack }) {
           <ArrowLeft size={18} />
           <span>{t('status.back')}</span>
         </button>
-        <h1 className="status-title">Koala TV — Status</h1>
+        <h1 className="status-title">{t('status.page_title')}</h1>
         <div className="status-updated">
-          {lastUpdated && <span>Mis à jour {relativeTime(lastUpdated.toISOString())}</span>}
+          {lastUpdated && <span>{t('status.last_updated')} {relativeTime(lastUpdated.toISOString())}</span>}
         </div>
       </header>
 
@@ -102,7 +102,7 @@ export default function StatusPage({ onBack }) {
       {banner && (
         <div className={`status-banner ${banner.cls}`}>
           {BannerIcon && <BannerIcon size={28} />}
-          <span>{banner.label}</span>
+          <span>{t(banner.labelKey)}</span>
         </div>
       )}
 
@@ -116,23 +116,27 @@ export default function StatusPage({ onBack }) {
                 <div className="status-row-head">
                   <div className="status-row-name">
                     <span>{c.name}</span>
-                    {c.critical && <span className="status-critical-pill">critique</span>}
+                    {c.critical && <span className="status-critical-pill">{t('status.critical_pill')}</span>}
                   </div>
-                  <span className={`status-pill ${meta.cls}`}>{meta.label}</span>
+                  <span className={`status-pill ${meta.cls}`}>{t(meta.labelKey)}</span>
                 </div>
                 {c.message && <div className="status-row-msg">{c.message}</div>}
-                <div className="status-strip" role="img" aria-label={`${c.name} — 90 derniers jours`}>
-                  {days.map((d) => (
+                <div className="status-strip" role="img" aria-label={`${c.name} — ${t('status.strip.aria_suffix')}`}>
+                  {days.map((d) => {
+                    const dm = STATUS_META[d.status];
+                    const dlabel = dm ? t(dm.labelKey) : d.status;
+                    return (
                     <span
                       key={d.day}
-                      className={`status-day ${STATUS_META[d.status]?.cls || 'st-unknown'}`}
-                      title={`${formatDay(d.day)} — ${STATUS_META[d.status]?.label || d.status}`}
+                      className={`status-day ${dm?.cls || 'st-unknown'}`}
+                      title={`${formatDay(d.day)} — ${dlabel}`}
                     />
-                  ))}
+                    );
+                  })}
                 </div>
                 <div className="status-strip-caption">
-                  <span>il y a 90 jours</span>
-                  <span>aujourd'hui</span>
+                  <span>{t('status.strip.caption_start')}</span>
+                  <span>{t('status.strip.caption_end')}</span>
                 </div>
               </div>
             );
@@ -141,11 +145,11 @@ export default function StatusPage({ onBack }) {
       )}
 
       <section className="status-incidents">
-        <h2>Incidents récents</h2>
+        <h2>{t('status.incidents.title')}</h2>
         {incidents.length === 0 ? (
           <div className="status-no-incidents">
             <CheckCircle2 size={18} />
-            <span>Aucun incident enregistré.</span>
+            <span>{t('status.incidents.empty')}</span>
           </div>
         ) : (
           <ul className="incident-list">
@@ -156,7 +160,7 @@ export default function StatusPage({ onBack }) {
                   <span className="incident-title">{inc.title}</span>
                   <span className="incident-time">
                     {new Date(inc.started_at).toLocaleString()}
-                    {inc.resolved_at ? ` → ${relativeTime(inc.resolved_at)}` : ' (en cours)'}
+                    {inc.resolved_at ? ` → ${relativeTime(inc.resolved_at)}` : t('status.incidents.in_progress')}
                   </span>
                 </div>
                 {inc.body && <div className="incident-body">{inc.body}</div>}
@@ -174,8 +178,8 @@ export default function StatusPage({ onBack }) {
       </section>
 
       <footer className="status-footer">
-        <span>Auto-refresh toutes les 30 s.</span>
-        {snapshot && <span>Dernier check : {new Date(snapshot.ts).toLocaleTimeString()}</span>}
+        <span>{t('status.footer.auto_refresh', { secs: Math.round(POLL_MS / 1000) })}</span>
+        {snapshot && <span>{t('status.footer.last_check', { time: new Date(snapshot.ts).toLocaleTimeString() })}</span>}
       </footer>
       </div>
     </div>

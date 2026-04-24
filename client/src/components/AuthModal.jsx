@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { t } from '../i18n';
 import './AuthModal.css';
 
 export default function AuthModal({ onClose, onLogin, onRegister }) {
@@ -37,13 +38,13 @@ export default function AuthModal({ onClose, onLogin, onRegister }) {
             className={`auth-tab ${tab === 'login' ? 'active' : ''}`}
             onClick={() => { setTab('login'); setError(''); }}
           >
-            Connexion
+            {t('auth.tab.login')}
           </button>
           <button
             className={`auth-tab ${tab === 'register' ? 'active' : ''}`}
             onClick={() => { setTab('register'); setError(''); }}
           >
-            Inscription
+            {t('auth.tab.register')}
           </button>
         </div>
 
@@ -51,7 +52,7 @@ export default function AuthModal({ onClose, onLogin, onRegister }) {
           {tab === 'register' && (
             <input
               type="text"
-              placeholder="Pseudo"
+              placeholder={t('auth.placeholder.username')}
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               className="auth-input"
@@ -60,7 +61,7 @@ export default function AuthModal({ onClose, onLogin, onRegister }) {
           )}
           <input
             type="email"
-            placeholder="Email"
+            placeholder={t('auth.placeholder.email')}
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             className="auth-input"
@@ -68,7 +69,7 @@ export default function AuthModal({ onClose, onLogin, onRegister }) {
           />
           <input
             type="password"
-            placeholder="Mot de passe"
+            placeholder={t('auth.placeholder.password')}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             className="auth-input"
@@ -78,7 +79,11 @@ export default function AuthModal({ onClose, onLogin, onRegister }) {
           {error && <div className="auth-error">{error}</div>}
 
           <button type="submit" className="auth-submit" disabled={loading}>
-            {loading ? '...' : tab === 'login' ? 'Se connecter' : "S'inscrire"}
+            {loading
+              ? t('auth.submit.loading')
+              : tab === 'login'
+                ? t('auth.submit.login')
+                : t('auth.submit.register')}
           </button>
         </form>
       </div>

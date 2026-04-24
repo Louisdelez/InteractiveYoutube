@@ -191,7 +191,7 @@ export default function PlanningPage({ onBack, channelId, channels }) {
       <header className="pl-header">
         <button className="pl-back" onClick={onBack}>
           <ArrowLeft size={16} />
-          <span>Retour</span>
+          <span>{t('status.back')}</span>
         </button>
         <div className="pl-title">
           <span>Programme</span>
