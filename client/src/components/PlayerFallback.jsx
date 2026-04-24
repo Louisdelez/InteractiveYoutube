@@ -1,9 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 import { Download, ExternalLink, MonitorPlay } from 'lucide-react';
 import { api } from '../services/api';
+import { t } from '../i18n';
 import './PlayerFallback.css';
 
-const FALLBACK_DOWNLOAD_URL = 'https://github.com/Louisdelez/InteractiveYoutube/releases/latest';
+const FALLBACK_DOWNLOAD_URL =
+  import.meta.env.VITE_DESKTOP_DOWNLOAD_URL ||
+  'https://github.com/Louisdelez/KoalaTV/releases/latest';
 
 export default function PlayerFallback({ tvState, clockOffset }) {
   const [currentTime, setCurrentTime] = useState(0);
@@ -18,7 +21,6 @@ export default function PlayerFallback({ tvState, clockOffset }) {
     return () => { alive = false; };
   }, []);
 
-  // Update timecode every second
   useEffect(() => {
     function updateTime() {
       if (!tvState) return;
@@ -50,10 +52,8 @@ export default function PlayerFallback({ tvState, clockOffset }) {
     <div className="fallback-container">
       <div className="fallback-content">
         <MonitorPlay size={48} className="fallback-icon" />
-        <h3 className="fallback-title">Lecture non disponible</h3>
-        <p className="fallback-text">
-          Cette vidéo n'est pas disponible en lecture intégrée (restriction du créateur).
-        </p>
+        <h3 className="fallback-title">{t('fallback.title')}</h3>
+        <p className="fallback-text">{t('fallback.body')}</p>
 
         <div className="fallback-actions">
           <a
@@ -63,7 +63,7 @@ export default function PlayerFallback({ tvState, clockOffset }) {
             className="fallback-btn fallback-btn-youtube"
           >
             <ExternalLink size={16} />
-            <span>Regarder sur YouTube</span>
+            <span>{t('fallback.watch_youtube')}</span>
             <span className="fallback-timecode">{formatTime(currentTime)}</span>
           </a>
 
@@ -74,13 +74,11 @@ export default function PlayerFallback({ tvState, clockOffset }) {
             className="fallback-btn fallback-btn-download"
           >
             <Download size={16} />
-            <span>Télécharger l'application</span>
+            <span>{t('fallback.download_app')}</span>
           </a>
         </div>
 
-        <p className="fallback-hint">
-          L'application desktop permet de regarder toutes les vidéos sans restriction.
-        </p>
+        <p className="fallback-hint">{t('fallback.hint')}</p>
       </div>
     </div>
   );

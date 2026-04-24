@@ -194,7 +194,7 @@ export default function PlanningPage({ onBack, channelId, channels }) {
           <span>{t('status.back')}</span>
         </button>
         <div className="pl-title">
-          <span>Programme</span>
+          <span>{t('topbar.programme.label')}</span>
           <select
             className="pl-channel-select"
             value={selectedChannelId || ''}

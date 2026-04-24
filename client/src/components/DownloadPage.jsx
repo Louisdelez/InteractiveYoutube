@@ -42,7 +42,7 @@ function detectOS() {
 
 function formatSize(bytes) {
   const mb = bytes / (1024 * 1024);
-  return `${mb.toFixed(mb < 10 ? 1 : 0)} Mo`;
+  return `${mb.toFixed(mb < 10 ? 1 : 0)} ${t('download.size_unit')}`;
 }
 
 function findAsset(assets, ...patterns) {
@@ -98,50 +98,50 @@ export default function DownloadPage({ onBack }) {
     return [
       {
         id: 'linux',
-        name: 'Linux',
+        name: t('download.platform.linux.name'),
         icon: PENGUIN_SVG,
-        description: "N'importe quelle distro",
+        description: t('download.platform.linux.desc'),
         primary: findAsset(a, 'appimage'),
-        primaryLabel: 'Télécharger .AppImage',
+        primaryLabel: t('download.platform.linux.primary'),
         secondary: [
-          { asset: findAsset(a, '.deb'), label: 'Debian / Ubuntu (.deb)' },
-          { asset: findAsset(a, 'linux-x86_64.tar.gz'), label: 'Archive .tar.gz' },
+          { asset: findAsset(a, '.deb'), label: t('download.platform.linux.deb') },
+          { asset: findAsset(a, 'linux-x86_64.tar.gz'), label: t('download.platform.linux.targz') },
         ],
       },
       {
         id: 'macos-silicon',
-        name: 'macOS',
-        subtitle: 'Apple Silicon',
+        name: t('download.platform.macos.name'),
+        subtitle: t('download.platform.macos.silicon_sub'),
         icon: APPLE_SVG,
-        description: 'M1 · M2 · M3 · M4',
+        description: t('download.platform.macos.silicon_desc'),
         primary: findAsset(a, 'macos-aarch64.dmg'),
-        primaryLabel: 'Télécharger .dmg',
+        primaryLabel: t('download.platform.macos.dmg'),
         secondary: [
-          { asset: findAsset(a, 'macos-universal.dmg'), label: 'Universal (Intel + ARM)' },
+          { asset: findAsset(a, 'macos-universal.dmg'), label: t('download.platform.macos.universal') },
         ],
       },
       {
         id: 'macos-intel',
-        name: 'macOS',
-        subtitle: 'Intel',
+        name: t('download.platform.macos.name'),
+        subtitle: t('download.platform.macos.intel_sub'),
         icon: APPLE_SVG,
-        description: 'Macs Intel',
+        description: t('download.platform.macos.intel_desc'),
         primary: findAsset(a, 'macos-x86_64.dmg'),
-        primaryLabel: 'Télécharger .dmg',
+        primaryLabel: t('download.platform.macos.dmg'),
         secondary: [
-          { asset: findAsset(a, 'macos-universal.dmg'), label: 'Universal (Intel + ARM)' },
+          { asset: findAsset(a, 'macos-universal.dmg'), label: t('download.platform.macos.universal') },
         ],
       },
       {
         id: 'windows',
-        name: 'Windows',
-        subtitle: '10 · 11',
+        name: t('download.platform.windows.name'),
+        subtitle: t('download.platform.windows.sub'),
         icon: WINDOWS_SVG,
-        description: 'Installeur guidé',
+        description: t('download.platform.windows.desc'),
         primary: findAsset(a, 'windows-x86_64-setup.exe'),
-        primaryLabel: "Télécharger l'installeur",
+        primaryLabel: t('download.platform.windows.setup'),
         secondary: [
-          { asset: findAsset(a, 'windows-x86_64.zip'), label: 'Archive portable (.zip)' },
+          { asset: findAsset(a, 'windows-x86_64.zip'), label: t('download.platform.windows.zip') },
         ],
       },
     ];
@@ -174,10 +174,8 @@ export default function DownloadPage({ onBack }) {
       <main className="dl-main">
         <div className="dl-hero">
           <img src="/koala-tv.png" alt="" className="dl-hero-logo" />
-          <h1 className="dl-hero-title">Télécharger Koala TV</h1>
-          <p className="dl-hero-sub">
-            L'application desktop permet de regarder toutes les vidéos, même celles qui refusent la lecture intégrée.
-          </p>
+          <h1 className="dl-hero-title">{t('download.hero.title')}</h1>
+          <p className="dl-hero-sub">{t('download.hero.sub')}</p>
         </div>
 
         <div className="dl-grid">
@@ -188,7 +186,7 @@ export default function DownloadPage({ onBack }) {
                 {isMine && (
                   <span className="dl-badge">
                     <Check size={12} />
-                    Détecté
+                    {t('download.badge.detected')}
                   </span>
                 )}
                 <div className="dl-card-icon">{p.icon}</div>
@@ -208,7 +206,7 @@ export default function DownloadPage({ onBack }) {
                     <em>{formatSize(p.primary.size)}</em>
                   </a>
                 ) : (
-                  <div className="dl-btn dl-btn-disabled">Indisponible</div>
+                  <div className="dl-btn dl-btn-disabled">{t('download.unavailable')}</div>
                 )}
                 {p.secondary.length > 0 && (
                   <ul className="dl-card-alt">
@@ -231,18 +229,18 @@ export default function DownloadPage({ onBack }) {
 
         <section className="dl-footer">
           <div className="dl-footer-head">
-            <h2>Tous les fichiers de la release</h2>
+            <h2>{t('download.release_title')}</h2>
             <a href={release.html_url} target="_blank" rel="noopener noreferrer" className="dl-footer-link">
               <GithubIcon size={14} />
-              <span>Voir sur GitHub</span>
+              <span>{t('download.view_github')}</span>
               <ExternalLink size={12} />
             </a>
           </div>
           <table className="dl-table">
             <thead>
               <tr>
-                <th>Fichier</th>
-                <th>Taille</th>
+                <th>{t('download.table.filename')}</th>
+                <th>{t('download.table.size')}</th>
                 <th></th>
               </tr>
             </thead>

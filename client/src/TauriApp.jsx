@@ -229,7 +229,7 @@ export default function TauriApp() {
         <div className="tauri-player-zone">
           <div className="tauri-player-area" ref={playerZoneRef}>
             {isLoading && <div className="tauri-player-msg">{t('common.loading')}</div>}
-            {!isLoading && !tvState && <div className="tauri-player-msg">Playlist non disponible</div>}
+            {!isLoading && !tvState && <div className="tauri-player-msg">{t('tauri.playlist_unavailable')}</div>}
           </div>
           {tvState && (
             <div className="tauri-player-info">

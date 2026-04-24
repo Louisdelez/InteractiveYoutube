@@ -292,15 +292,13 @@ export default function App() {
         />
       )}
       {maintWarning && !maintenance && (
-        <div className="maintenance-warning-bar">
-          Maintenance dans 5 minutes — le chat sera clear et le serveur redémarre
-        </div>
+        <div className="maintenance-warning-bar">{t('maintenance.warning_bar')}</div>
       )}
       {maintenance && (
         <div className="maintenance-overlay">
           <div className="maintenance-box">
-            <div className="maintenance-title">Maintenance en cours</div>
-            <div className="maintenance-text">L'application sera disponible dans quelques instants...</div>
+            <div className="maintenance-title">{t('maintenance.ongoing_title')}</div>
+            <div className="maintenance-text">{t('status.service_starting')}</div>
           </div>
         </div>
       )}
