@@ -251,4 +251,13 @@ async function clearAllChatHistory(io) {
   return keys.length;
 }
 
-module.exports = { registerChatHandlers, stopBatching, clearAllChatHistory, getHistory };
+module.exports = {
+  registerChatHandlers,
+  stopBatching,
+  clearAllChatHistory,
+  getHistory,
+  // Pure helpers exported for unit tests (XSS-adjacent sanitation +
+  // unicode-safe length clamping both have attack-surface invariants
+  // that deserve explicit coverage).
+  _internal: { sanitizeText, clampCodepoints, formatServerTime },
+};

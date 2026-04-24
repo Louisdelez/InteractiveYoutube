@@ -286,4 +286,14 @@ module.exports = {
   getPlaylist,
   getVideoIds,
   reloadFromDisk,
+  // Exported for unit tests. These are pure functions with non-trivial
+  // invariants (timecode preservation, prefix-sum integrity, stable
+  // shuffle per seed) — they deserve test coverage that proves a
+  // future refactor hasn't silently broken playback math.
+  _internal: {
+    seededShuffle,
+    buildPrefixSums,
+    mergePlaylistPreservingTimecode,
+    mulberry32,
+  },
 };
