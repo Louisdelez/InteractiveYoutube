@@ -495,7 +495,7 @@ impl PlayerView {
                                     // the audible burst when video
                                     // suddenly appears.
                                     if just_became_ready && !p.using_backup {
-                                        let _ = p.mpv.set_property("mute", false);
+                                        mpv_try!(p.mpv.set_property("mute", false), "main unmute (post first-frame)");
                                         fade_volume(p.mpv.clone(), 0, 100, 200, cx);
                                     }
 
@@ -715,11 +715,12 @@ impl PlayerView {
                                                 // Unmute main BEFORE the fade —
                                                 // the fade only ramps volume,
                                                 // mute=true would keep us silent.
-                                                let _ = p.mpv.set_property("mute", false);
+                                                mpv_try!(p.mpv.set_property("mute", false), "main unmute (post first-frame)");
                                                 if drift > 0.3 && backup_pos > 0.5 {
-                                                    let _ = p.mpv.set_property(
-                                                        "time-pos",
-                                                        backup_pos,
+                                                    mpv_try!(
+                                                        p.mpv.set_property("time-pos", backup_pos),
+                                                        "main drift-align seek",
+                                                        backup_pos
                                                     );
                                                 }
                                                 // Audio crossfade 120ms.
@@ -934,7 +935,7 @@ impl PlayerView {
     pub fn seek(&self, seconds: f64) {
         {
             let mpv = &self.mpv;
-            let _ = mpv.set_property("time-pos", seconds);
+            mpv_try!(mpv.set_property("time-pos", seconds), "main seek", seconds);
         }
     }
 
@@ -1403,8 +1404,8 @@ impl PlayerView {
     pub fn force_play(&self) {
         {
             let mpv = &self.mpv;
-            let _ = mpv.set_property("pause", false);
-            let _ = mpv.command("seek", &["0", "relative"]);
+            mpv_try!(mpv.set_property("pause", false), "main resume");
+            mpv_try!(mpv.command("seek", &["0", "relative"]), "main seek 0 relative");
         }
     }
 
@@ -1524,12 +1525,20 @@ impl PlayerView {
         // but the user is now watching the backup so doesn't notice.
         {
             let mpv = &self.mpv;
-            let _ = mpv.set_property("ytdl-format", fmt);
-            let _ = mpv.set_property("mute", true); // backup carries the audio
+            mpv_try!(mpv.set_property("ytdl-format", fmt), "main quality change", fmt);
+            mpv_try!(mpv.set_property("mute", true), "main mute for quality-change reload"); // backup carries the audio
             if saved_pos > 0.5 {
-                let _ = mpv.set_property("start", format!("+{}", saved_pos));
+                mpv_try!(
+                    mpv.set_property("start", format!("+{}", saved_pos)),
+                    "main set start (quality reload)",
+                    saved_pos
+                );
             }
-            let _ = mpv.command("loadfile", &[&self.current_url]);
+            mpv_try!(
+                mpv.command("loadfile", &[&self.current_url]),
+                "main loadfile (quality reload)",
+                &self.current_url
+            );
         }
 
         // The poll loop's existing "swap back after 8 s if main is healthy"
@@ -1542,11 +1551,11 @@ impl PlayerView {
             let mpv = &self.mpv;
             match id {
                 Some(sid) => {
-                    let _ = mpv.set_property("sid", sid);
-                    let _ = mpv.set_property("sub-visibility", true);
+                    mpv_try!(mpv.set_property("sid", sid), "main set sub track", sid);
+                    mpv_try!(mpv.set_property("sub-visibility", true), "main subs on");
                 }
                 None => {
-                    let _ = mpv.set_property("sub-visibility", false);
+                    mpv_try!(mpv.set_property("sub-visibility", false), "main subs off");
                 }
             }
         }
@@ -1670,7 +1679,7 @@ impl PlayerView {
     pub fn set_audio_track(&mut self, id: i64) {
         {
             let mpv = &self.mpv;
-            let _ = mpv.set_property("aid", id);
+            mpv_try!(mpv.set_property("aid", id), "main set audio track", id);
         }
         self.audio_label = self
             .list_audio_tracks()
@@ -1710,9 +1719,10 @@ impl PlayerView {
                     if let Ok(pos) = mpv.get_property::<f64>("time-pos") {
                         // Seek to current pos = full A/V resync, no
                         // perceptible position change.
-                        let _ = mpv.command(
-                            "seek",
-                            &[&format!("{}", pos), "absolute+exact"],
+                        mpv_try!(
+                            mpv.command("seek", &[&format!("{}", pos), "absolute+exact"]),
+                            "main A/V resync seek",
+                            pos
                         );
                     }
                 }
@@ -1877,7 +1887,7 @@ impl Render for PlayerView {
                         cx.listener(|this, _ev: &ClickEvent, window, cx| {
                             let new = if this.volume > 0 { 0 } else { 100 };
                             this.volume = new;
-                            let _ = this.mpv.set_property("volume", new);
+                            mpv_try!(this.mpv.set_property("volume", new), "main volume slider", new);
                             this.volume_state.update(cx, |s, cx| {
                                 s.set_value(new as f32, window, cx);
                             });
