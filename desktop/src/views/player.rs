@@ -69,179 +69,18 @@ use crate::theme::layout::{CHAT_W, CONTROL_BAR_H, INFOBAR_H, SIDEBAR_W, TOPBAR_H
 
 const ICON_PX: u32 = 20;
 
-/// Extract the YouTube video ID from a URL like "https://www.youtube.com/watch?v=XXXX".
-/// Returns None for channel handles or non-watch URLs.
-fn extract_video_id(url: &str) -> Option<String> {
-    let after_v = url.split("watch?v=").nth(1)?;
-    let id: String = after_v.chars().take_while(|c| *c != '&' && *c != '#').collect();
-    if id.len() == 11 { Some(id) } else { None }
-}
-
-/// Open a URL in the user's default browser.
-fn open_in_browser(url: &str) {
-    // Spawn xdg-open in a detached thread that waits — without
-    // wait()ing the child becomes a zombie that lingers in the
-    // process table.
-    let url = url.to_string();
-    std::thread::spawn(move || {
-        if let Ok(mut child) = std::process::Command::new("xdg-open").arg(&url).spawn() {
-            let _ = child.wait();
-        }
-    });
-}
-
-/// Format a publishedAt ISO string (e.g. "2019-02-12T15:00:00Z") into
-/// a French tooltip like "Mardi 12 février 2019 — il y a 6 ans".
-fn format_published_tooltip(iso: &str) -> Option<String> {
-    let date_part = iso.get(..10)?;
-    let parts: Vec<&str> = date_part.split('-').collect();
-    if parts.len() != 3 { return None; }
-    let year: i32 = parts[0].parse().ok()?;
-    let month: u32 = parts[1].parse().ok()?;
-    let day: u32 = parts[2].parse().ok()?;
-
-    let months_fr = [
-        "", "janvier", "février", "mars", "avril", "mai", "juin",
-        "juillet", "août", "septembre", "octobre", "novembre", "décembre",
-    ];
-    let days_fr = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"];
-
-    // Zeller-like day of week (Tomohiko Sakamoto)
-    let t = [0i32, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4];
-    let y = if month < 3 { year - 1 } else { year };
-    let dow = ((y + y / 4 - y / 100 + y / 400 + t[month as usize - 1] + day as i32) % 7) as usize;
-    // dow: 0=Sun..6=Sat → convert to 0=Mon..6=Sun
-    let dow_mon = if dow == 0 { 6 } else { dow - 1 };
-    let day_name = days_fr.get(dow_mon).unwrap_or(&"");
-    let month_name = months_fr.get(month as usize).unwrap_or(&"");
-
-    // Time elapsed
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default();
-    let now_year = 1970 + (now.as_secs() / 31_557_600) as i32; // approx
-    let diff_years = now_year - year;
-    let ago = if diff_years >= 2 {
-        format!("il y a {} ans", diff_years)
-    } else if diff_years == 1 {
-        "il y a 1 an".to_string()
-    } else {
-        let now_month = ((now.as_secs() % 31_557_600) / 2_629_800) as u32 + 1;
-        let diff_months = (now_year - year) as u32 * 12 + now_month.saturating_sub(month);
-        if diff_months > 1 {
-            format!("il y a {} mois", diff_months)
-        } else if diff_months == 1 {
-            "il y a 1 mois".to_string()
-        } else {
-            "récente".to_string()
-        }
-    };
-
-    Some(format!(
-        "{} {} {} {} — {}",
-        day_name.chars().next().map(|c| c.to_uppercase().to_string()).unwrap_or_default()
-            + &day_name[1..],
-        day,
-        month_name,
-        year,
-        ago,
-    ))
-}
-
-/// Append a debug line to /tmp/iyt-quality.log (used to diagnose the
-/// dual-quality fallback). Best-effort, never panics.
-fn log_quality(msg: &str) {
-    use std::io::Write;
-    if let Ok(mut f) = std::fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open("/tmp/iyt-quality.log")
-    {
-        let _ = writeln!(
-            f,
-            "[{:?}] {}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap_or_default()
-                .as_secs(),
-            msg
-        );
-    }
-}
-
-/// Locate bundled mpv user-shaders next to the executable.
-/// Returns a colon-separated path string for `glsl-shaders` or None if no
-/// shaders are present.
-fn bundled_shader_paths() -> Option<String> {
-    let exe = std::env::current_exe().ok()?;
-    let exe_dir = exe.parent()?;
-    // Look in <exe_dir>/shaders/ first (release layout), then in
-    // <project_root>/assets/shaders/ (dev layout).
-    let candidates = [
-        exe_dir.join("shaders"),
-        exe_dir.join("../../assets/shaders"),
-        exe_dir.join("../../../assets/shaders"),
-    ];
-    for dir in candidates {
-        if !dir.is_dir() {
-            continue;
-        }
-        let mut paths = Vec::new();
-        if let Ok(entries) = std::fs::read_dir(&dir) {
-            for entry in entries.flatten() {
-                let p = entry.path();
-                if p.extension().and_then(|s| s.to_str()) == Some("glsl") {
-                    if let Some(s) = p.to_str() {
-                        paths.push(s.to_string());
-                    }
-                }
-            }
-        }
-        if !paths.is_empty() {
-            paths.sort();
-            return Some(paths.join(":"));
-        }
-    }
-    None
-}
+// Helpers moved to `views/player_util.rs` so unit tests can compile
+// without triggering an rustc SIGSEGV on the 2300-LOC player.rs
+// (GPUI macro expansion depth). Re-exported here as free functions
+// via `use` so the rest of this file keeps its existing call sites.
+use super::player_util::{
+    bundled_shader_paths, extract_video_id, format_published_tooltip,
+    lang_display_name, log_quality, open_in_browser,
+};
 
 /// Five "default" subtitle languages shown in the captions popup.
 /// User can click "Plus de langues" to see everything else.
 const COMMON_SUB_LANGS: &[&str] = &["fr", "en", "de", "es", "it"];
-
-fn lang_display_name(code: &str) -> &str {
-    match code {
-        "fr" => "Français",
-        "en" => "English",
-        "de" => "Deutsch",
-        "es" => "Español",
-        "it" => "Italiano",
-        "pt" => "Português",
-        "ru" => "Русский",
-        "ja" => "日本語",
-        "ko" => "한국어",
-        "zh" => "中文",
-        "ar" => "العربية",
-        "nl" => "Nederlands",
-        "pl" => "Polski",
-        "tr" => "Türkçe",
-        "sv" => "Svenska",
-        "no" => "Norsk",
-        "da" => "Dansk",
-        "fi" => "Suomi",
-        "el" => "Ελληνικά",
-        "he" => "עברית",
-        "hi" => "हिन्दी",
-        "th" => "ไทย",
-        "vi" => "Tiếng Việt",
-        "uk" => "Українська",
-        "cs" => "Čeština",
-        "hu" => "Magyar",
-        "ro" => "Română",
-        "id" => "Indonesia",
-        _ => code,
-    }
-}
 
 // **No AV1**: YouTube increasingly serves AV1 but GPUs older than
 // NVIDIA Ampere (RTX 30-series) + AMD RDNA 2 have no hardware AV1
